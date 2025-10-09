@@ -1,0 +1,12 @@
+{
+  "name": "dashboard",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "air",
+    "build": "go build -o bin/server cmd/dashboard/main.go"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

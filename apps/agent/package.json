@@ -1,0 +1,12 @@
+{
+  "name": "agent",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "air",
+    "build": "go build -o bin/agent cmd/agent/main.go"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

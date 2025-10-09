@@ -1,0 +1,13 @@
+.DS_Store
+/agent
+/cmd/agent/agent
+/cmd/agent/config.yml
+*.pprof
+dist
+/model/zconfig.go
+
+# Temporary build artifacts (e.g. go-air)
+tmp/
+
+# Ignore customized Go sources in this workspace
+/tmp/*
