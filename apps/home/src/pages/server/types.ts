@@ -50,6 +50,9 @@ export interface State {
   tcp_conn_count?: number
   udp_conn_count?: number
   process_count?: number
-  temperatures?: number[]
+  temperatures?: Array<{
+    name?: string
+    temperature?: number
+  }>
   gpu?: any
 }

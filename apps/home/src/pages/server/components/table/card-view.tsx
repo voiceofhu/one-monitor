@@ -1,10 +1,12 @@
+import ServerFlag from "@/components/ServerFlag"
 import { AnimatedNumber } from "@/components/animated-number"
-import { Badge } from "@/components/ui/badge"
-import { cn, formatBytes, formatBytesWithUnifiedUnit, formatUptime } from "@/lib/utils"
+import { cn, formatBytes, formatBytesWithUnifiedUnit } from "@/lib/utils"
+import { ArrowDownRight, ArrowUpRight, Gauge, Timer } from "lucide-react"
 import { type ReactNode } from "react"
 
 import { vps } from "../../types"
 import { calculateHealthScore } from "./column/health"
+import { Progress } from "./progress"
 
 export function CardView({ servers }: { servers: vps[] }) {
   if (!servers.length) {
@@ -12,8 +14,8 @@ export function CardView({ servers }: { servers: vps[] }) {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-4">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div className="flex-1 overflow-auto ">
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {servers.map((server) => {
           const cpuUsage = server.state.cpu || 0
 
@@ -27,92 +29,106 @@ export function CardView({ servers }: { servers: vps[] }) {
           const diskUsage = diskTotal > 0 ? (diskUsed / diskTotal) * 100 : 0
           const { value1: diskUsedValue, value2: diskTotalValue, unit: diskUnit } = formatBytesWithUnifiedUnit(diskUsed, diskTotal)
 
+          const swapTotal = server.host.swap_total || 0
+          const swapUsed = server.state.swap_used || 0
+          const swapUsage = swapTotal > 0 ? (swapUsed / swapTotal) * 100 : 0
+          const { value1: swapUsedValue, value2: swapTotalValue, unit: swapUnit } = formatBytesWithUnifiedUnit(swapUsed, swapTotal)
+          const swapDetail = swapTotal > 0 ? `${swapUsedValue} / ${swapTotalValue} ${swapUnit}` : ""
+
           const netInSpeed = formatBytes(server.state.net_in_speed || 0)
           const netOutSpeed = formatBytes(server.state.net_out_speed || 0)
 
           const netInTransfer = formatBytes(server.state.net_in_transfer || 0)
           const netOutTransfer = formatBytes(server.state.net_out_transfer || 0)
 
-          const uptime = formatUptime(server.state.uptime || 0)
+          const uptimeSeconds = server.state.uptime || 0
+          const load1 = server.state.load_1 ?? 0
+          const load5 = server.state.load_5 ?? 0
+          const load15 = server.state.load_15 ?? 0
+          const cpuCores = server.host.cpu?.length || 1
+          const loadSummary = cpuCores > 0 ? `${load5.toFixed(2)} / ${cpuCores}` : load5.toFixed(2)
+          const loadDetail = `1m ${load1.toFixed(2)} · 5m ${load5.toFixed(2)} · 15m ${load15.toFixed(2)}`
+
           const healthScore = calculateHealthScore(server)
-          const isOnline = (server.state.uptime || 0) > 0 || (server.state.net_in_speed || server.state.net_out_speed || 0) > 0
+          const healthPercentage = Math.max(0, Math.min(100, healthScore))
+          // const healthPercentage = 0
+          const isOnline = uptimeSeconds > 0 || (server.state.net_in_speed || server.state.net_out_speed || 0) > 0
+          const uptimeLabel = isOnline ? formatUptimeCompact(uptimeSeconds) : "离线"
 
           const memDetail = memTotal > 0 ? `${memUsedValue} / ${memTotalValue} ${memUnit}` : ""
           const diskDetail = diskTotal > 0 ? `${diskUsedValue} / ${diskTotalValue} ${diskUnit}` : ""
           const platformLabel = [server.host.platform, server.host.platform_version].filter(Boolean).join(" ")
           const osLabel = [platformLabel, server.host.arch].filter(Boolean).join(" / ") || "-"
-          const uptimeLabel = uptime || "离线"
-          const statusTone = isOnline ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-500"
+          const statusTone = isOnline ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-500"
+          const countryCode = (server.country_code || server.host.country_code || "").trim()
+          const healthHue = (healthPercentage / 100) * 120
+          const gradientStop = Math.max(healthPercentage, 10)
+          const gradientFadeStop = Math.min(gradientStop + 25, 100)
+          const tintColor = `hsla(${healthHue}, 85%, 60%, 0.22)`
+          const cardBorderColor = `hsla(${healthHue}, 70%, 45%, 0.35)`
+          const cardGradient = `linear-gradient(135deg, ${tintColor} 0%, ${tintColor} ${gradientStop}%, transparent ${gradientFadeStop}%)`
+
+          const temperatureReadings = normalizeTemperatures(server.state.temperatures)
+          const hasTemperatures = temperatureReadings.length > 0
+
+          const metrics: { label: string; percentage: number; detail?: string }[] = [
+            { label: "CPU", percentage: cpuUsage, detail: `${cpuUsage.toFixed(1)}%` },
+            { label: "内存", percentage: memUsage, detail: memDetail },
+            { label: "磁盘", percentage: diskUsage, detail: diskDetail },
+          ]
+          if (swapTotal > 0) {
+            metrics.push({ label: "交换分区", percentage: swapUsage, detail: swapDetail })
+          }
 
           return (
             <div
               key={server.id}
-              className="h-full rounded-3xl bg-card/95 border border-border/40 shadow-[0_12px_24px_rgba(15,23,42,0.08)] transition-all hover:shadow-[0_18px_32px_rgba(15,23,42,0.12)]"
+              className="h-full rounded-2xl border border-border/60 bg-background/60 p-3 transition-colors"
+              style={{ borderColor: cardBorderColor, backgroundImage: cardGradient }}
             >
-              <div className="flex flex-col gap-4 p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="text-lg font-semibold leading-tight truncate">{server.name}</h3>
-                    {server.host.ip ? <p className="mt-1 text-[12px] text-muted-foreground truncate">{server.host.ip}</p> : null}
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {countryCode ? <ServerFlag country_code={countryCode} className="text-[14px]" /> : null}
+                    <span className="truncate text-[12px] font-semibold leading-tight text-foreground">{server.name}</span>
                   </div>
-                  <Badge className={`text-xs px-3 py-1 rounded-full font-medium ${statusTone}`}>{isOnline ? "在线" : "离线"}</Badge>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("rounded-full px-2 py-1 text-[10px] font-medium leading-none", statusTone)}>
+                      {isOnline ? <AnimatedNumber value={healthScore} decimals={0} /> : "离线"}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="rounded-2xl bg-muted/30 px-4 py-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>健康值</span>
-                    <AnimatedNumber value={healthScore} decimals={0} className="text-sm font-semibold text-primary" />
+                <div className="rounded-2xl bg-muted/20  py-3 space-y-3 text-[11px]">
+                  <div className="grid grid-cols-2 gap-2">
+                    <MetaInfo label="操作系统" value={osLabel} />
+                    <MetaInfo label="平均负载" value={loadSummary} detail={loadDetail} icon={<Gauge className="h-3.5 w-3.5" />} />
+                    <MetaInfo
+                      label="在线时间"
+                      value={uptimeLabel}
+                      icon={<Timer className="h-3.5 w-3.5" />}
+                      valueClassName={isOnline ? "text-emerald-600" : "text-rose-500"}
+                    />
+                    <MetaInfo label="CPU 核心" value={`${cpuCores}`} detail={server.host.arch || ""} />
                   </div>
-                  <InlineBar percentage={healthScore} />
-                </div>
-
-                <div className="rounded-2xl bg-muted/20 px-4 py-3 space-y-3 text-xs">
-                  <InfoRow label="操作系统">
-                    <span className="text-sm font-medium text-foreground">{osLabel}</span>
-                  </InfoRow>
 
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <MetricBlock label="CPU" value={cpuUsage} percentage={cpuUsage} suffix="%" decimals={1} />
-                    <MetricBlock label="内存" value={memUsage} percentage={memUsage} suffix="%" decimals={1} detail={memDetail} />
-                    <MetricBlock label="磁盘" value={diskUsage} percentage={diskUsage} suffix="%" decimals={1} detail={diskDetail} />
-                    <InfoRow label="在线时间">
-                      <span className={`text-sm font-medium ${isOnline ? "text-emerald-600" : "text-rose-500"}`}>{uptimeLabel}</span>
-                    </InfoRow>
+                    {metrics.map((metric) => (
+                      <MetricCard key={metric.label} {...metric} />
+                    ))}
                   </div>
 
-                  <SummaryRow label="总流量" up={netInTransfer} down={netOutTransfer} />
-                  <SummaryRow label="网络" up={`${netInSpeed}/s`} down={`${netOutSpeed}/s`} />
+                  <TrafficBlock
+                    netInSpeed={`${netInSpeed}/s`}
+                    netOutSpeed={`${netOutSpeed}/s`}
+                    netInTransfer={netInTransfer}
+                    netOutTransfer={netOutTransfer}
+                  />
+
+                  {hasTemperatures ? <TemperatureBlock temperatures={temperatureReadings} /> : null}
                 </div>
 
-                <div className="flex items-center justify-between gap-2 px-1 text-[11px] text-muted-foreground">
-                  <span>
-                    进程数{" "}
-                    {typeof server.state.process_count === "number" ? (
-                      <AnimatedNumber value={server.state.process_count} decimals={0} />
-                    ) : (
-                      "-"
-                    )}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span>
-                      TCP{" "}
-                      {typeof server.state.tcp_conn_count === "number" ? (
-                        <AnimatedNumber value={server.state.tcp_conn_count} decimals={0} />
-                      ) : (
-                        "-"
-                      )}
-                    </span>
-                    /
-                    <span>
-                      UDP{" "}
-                      {typeof server.state.udp_conn_count === "number" ? (
-                        <AnimatedNumber value={server.state.udp_conn_count} decimals={0} />
-                      ) : (
-                        "-"
-                      )}
-                    </span>
-                  </span>
-                </div>
+                <FooterStats server={server} />
               </div>
             </div>
           )
@@ -122,97 +138,192 @@ export function CardView({ servers }: { servers: vps[] }) {
   )
 }
 
-function MetricBlock({
-  label,
-  value,
-  percentage,
-  detail,
-  decimals = 0,
-  suffix = "",
-}: {
-  label: string
-  value: number
-  percentage: number
-  detail?: string
-  decimals?: number
-  suffix?: string
-}) {
+function MetricCard({ label, percentage, detail }: { label: string; percentage: number; detail?: string }) {
+  const safePercentage = Math.max(0, Math.min(100, Number.isFinite(percentage) ? percentage : 0))
   return (
-    <div className="flex flex-col gap-1 rounded-2xl bg-background/80 px-3 py-3 shadow-inner">
+    <div className="flex flex-col gap-1 rounded-xl border border-primary/10 bg-primary/5 px-3 py-3 shadow-inner shadow-primary/10">
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{label}</span>
-        <AnimatedNumber value={value} decimals={decimals} suffix={suffix} className="text-sm font-medium text-foreground" />
+        <span className="font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <InlineBar percentage={percentage} />
+      <Progress
+        usagePercentage={safePercentage}
+        size="sm"
+        value={<AnimatedNumber value={safePercentage} decimals={1} suffix="%" />}
+        textClassName="justify-between text-[11px] px-0"
+      />
       {detail ? <span className="text-[10px] text-muted-foreground">{detail}</span> : null}
     </div>
   )
 }
 
-function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+function MetaInfo({
+  label,
+  value,
+  detail,
+  icon,
+  valueClassName,
+}: {
+  label: string
+  value: string
+  detail?: string
+  icon?: ReactNode
+  valueClassName?: string
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl bg-background/80 px-3 py-3 shadow-inner">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <div className="text-right">{children}</div>
+    <div className="rounded-lg border border-border/50 bg-background/80 px-2.5 py-2">
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          {icon ? icon : null}
+          {label}
+        </span>
+        <span className={cn("text-[11px] font-semibold text-foreground", valueClassName)}>{value || "-"}</span>
+      </div>
+      {detail ? <div className="mt-1 text-[10px] text-muted-foreground/80">{detail}</div> : null}
     </div>
   )
 }
 
-function SummaryRow({ label, up, down }: { label: string; up: string; down: string }) {
-  const renderValue = (value: string, type: "up" | "down") => {
-    const trimmed = value.trim()
-    const match = trimmed.match(/^([+-]?\d+(?:\.\d+)?)(.*)$/)
-    if (!match) {
-      return <span>{value}</span>
-    }
-    const [, numericPart, unitPart = ""] = match
-    const numericValue = Number.parseFloat(numericPart)
-    if (Number.isNaN(numericValue)) {
-      return <span>{value}</span>
-    }
-    const decimals = numericPart.includes(".") ? numericPart.split(".")[1].length : 0
-    return (
-      <span className={cn("flex items-center gap-1", type === "up" ? "text-emerald-500" : "text-sky-500")}>
-        {type === "up" ? <UpArrowIcon className="h-3 w-3" /> : <DownArrowIcon className="h-3 w-3" />}
-        <AnimatedNumber value={numericValue} decimals={decimals} suffix={unitPart} />
+function TrafficBlock({
+  netInSpeed,
+  netOutSpeed,
+  netInTransfer,
+  netOutTransfer,
+}: {
+  netInSpeed: string
+  netOutSpeed: string
+  netInTransfer: string
+  netOutTransfer: string
+}) {
+  return (
+    <div className="rounded-xl border border-primary/10 bg-primary/5 px-3 py-2 text-[11px]">
+      <div className="flex gap-2 items-center justify-between text-muted-foreground">
+        <span>实时网络</span>
+        <span className="flex flex-1 justify-between items-center gap-2 font-medium text-[11px]">
+          {renderDirectionalValue(netInSpeed, "up")}
+          {renderDirectionalValue(netOutSpeed, "down")}
+        </span>
+      </div>
+      <div className="mt-1.5 flex gap-2 items-center justify-between text-muted-foreground">
+        <span>累计流量</span>
+        <span className="flex flex-1 justify-between items-center gap-2 font-medium text-[11px]">
+          {renderDirectionalValue(netInTransfer, "up")}
+          {renderDirectionalValue(netOutTransfer, "down")}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+type TemperatureReading = {
+  name: string
+  temperature: number
+}
+
+function TemperatureBlock({ temperatures }: { temperatures: TemperatureReading[] }) {
+  return (
+    <div className="rounded-xl border border-primary/10 bg-primary/5 px-3 py-2 text-[11px]">
+      <div className="mb-1 flex items-center justify-between text-muted-foreground">
+        <span>温度</span>
+        <span className="text-[10px] text-muted-foreground/70">°C</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {temperatures.map((sensor, index) => (
+          <span
+            key={`${sensor.name}-${index}`}
+            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary"
+          >
+            <span className="truncate max-w-[80px]">{sensor.name}</span>
+            <AnimatedNumber value={sensor.temperature} decimals={1} suffix="°C" />
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FooterStats({ server }: { server: vps }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[10px] text-muted-foreground">
+      <span>进程数 {typeof server.state.process_count === "number" ? <AnimatedNumber value={server.state.process_count} decimals={0} /> : "-"}</span>
+      <span className="flex items-center gap-2">
+        <span>TCP {typeof server.state.tcp_conn_count === "number" ? <AnimatedNumber value={server.state.tcp_conn_count} decimals={0} /> : "-"}</span>
+        <span className="text-muted-foreground">/</span>
+        <span>UDP {typeof server.state.udp_conn_count === "number" ? <AnimatedNumber value={server.state.udp_conn_count} decimals={0} /> : "-"}</span>
       </span>
-    )
+    </div>
+  )
+}
+
+function renderDirectionalValue(value: string, type: "up" | "down") {
+  const trimmed = value.trim()
+  const match = trimmed.match(/^([+-]?\d+(?:\.\d+)?)(.*)$/)
+  if (!match) {
+    return <span>{value}</span>
+  }
+  const [, numericPart, unitPart = ""] = match
+  const numericValue = Number.parseFloat(numericPart)
+  if (Number.isNaN(numericValue)) {
+    return <span>{value}</span>
+  }
+  const decimals = numericPart.includes(".") ? numericPart.split(".")[1].length : 0
+  return (
+    <span className={cn("flex items-center gap-1", type === "up" ? "text-emerald-500" : "text-sky-500")}>
+      {type === "up" ? <ArrowUpRight className="h-3 w-3" strokeWidth={2} /> : <ArrowDownRight className="h-3 w-3" strokeWidth={2} />}
+      <AnimatedNumber value={numericValue} decimals={decimals} suffix={unitPart} />
+    </span>
+  )
+}
+
+function normalizeTemperatures(temperatures: vps["state"]["temperatures"]): TemperatureReading[] {
+  if (!Array.isArray(temperatures) || temperatures.length === 0) {
+    return []
   }
 
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl bg-background/80 px-3 py-3 shadow-inner text-xs">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <span className="flex items-center gap-3 font-medium">
-        {renderValue(up, "up")}
-        {renderValue(down, "down")}
-      </span>
-    </div>
-  )
+  const normalized = temperatures
+    .map((entry, index) => {
+      if (entry == null) {
+        return null
+      }
+      if (typeof entry === "number") {
+        return {
+          name: `传感器${index + 1}`,
+          temperature: entry,
+        }
+      }
+      const typed = entry as { name?: unknown; Name?: unknown; temperature?: unknown; Temperature?: unknown }
+      const rawTemp = typed.temperature ?? typed.Temperature
+      const tempValue = typeof rawTemp === "number" ? rawTemp : Number.parseFloat(String(rawTemp))
+      if (!Number.isFinite(tempValue)) {
+        return null
+      }
+      const rawNameValue = typed.name ?? typed.Name
+      const rawName = typeof rawNameValue === "string" ? rawNameValue : ""
+      const name = rawName.trim() ? rawName.trim() : `传感器${index + 1}`
+      return {
+        name,
+        temperature: tempValue,
+      }
+    })
+    .filter((item): item is TemperatureReading => Boolean(item && Number.isFinite(item.temperature)))
+
+  return normalized.sort((a, b) => b.temperature - a.temperature).slice(0, 4)
 }
 
-function InlineBar({ percentage }: { percentage: number }) {
-  const value = Math.max(0, Math.min(100, Number.isFinite(percentage) ? percentage : 0))
-  return (
-    <div className="h-2 rounded-full bg-muted/60">
-      <div className="h-full rounded-full bg-primary/80 transition-all" style={{ width: `${value}%` }} />
-    </div>
-  )
-}
+function formatUptimeCompact(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "-"
+  }
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
 
-function UpArrowIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className={cn("h-3.5 w-3.5", className)}>
-      <path d="M5.25 5.25h5.5v5.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5.25 10.75 10.75 5.25" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days}天`)
+  if (hours > 0) parts.push(`${hours}小时`)
+  if (minutes > 0 && parts.length < 2) parts.push(`${minutes}分钟`)
 
-function DownArrowIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className={cn("h-3.5 w-3.5", className)}>
-      <path d="M10.75 10.75h-5.5v-5.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5.25 5.25 10.75 10.75" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
+  if (parts.length === 0) {
+    return "<1分钟"
+  }
+  return parts.slice(0, 2).join(" ")
 }

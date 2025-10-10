@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -16,6 +17,8 @@ import (
 	"github.com/nezhahq/nezha/model"
 	pb "github.com/nezhahq/nezha/proto"
 	"github.com/nezhahq/nezha/service/singleton"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var _ pb.NezhaServiceServer = (*NezhaHandler)(nil)
@@ -43,12 +46,23 @@ func (s *NezhaHandler) RequestTask(stream pb.NezhaService_RequestTaskServer) err
 		return err
 	}
 
-	server, _ := singleton.ServerShared.Get(clientID)
+	server, ok := singleton.ServerShared.Get(clientID)
+	if !ok || server == nil {
+		return errors.New("server not found")
+	}
 	server.TaskStream = stream
+	defer func() {
+		server.TaskStream = nil
+	}()
+
 	var result *pb.TaskResult
 	for {
 		result, err = stream.Recv()
 		if err != nil {
+			if errors.Is(err, io.EOF) || status.Code(err) == codes.Canceled {
+				log.Printf("NEZHA>> RequestTask stream closed, clientID: %d\n", clientID)
+				return nil
+			}
 			log.Printf("NEZHA>> RequestTask error: %v, clientID: %d\n", err, clientID)
 			return err
 		}
@@ -101,6 +115,10 @@ func (s *NezhaHandler) ReportSystemState(stream pb.NezhaService_ReportSystemStat
 	for {
 		state, err = stream.Recv()
 		if err != nil {
+			if errors.Is(err, io.EOF) || status.Code(err) == codes.Canceled {
+				log.Printf("NEZHA>> ReportSystemState stream closed, clientID: %d\n", clientID)
+				return nil
+			}
 			log.Printf("NEZHA>> ReportSystemState error: %v, clientID: %d\n", err, clientID)
 			return err
 		}
@@ -122,6 +140,10 @@ func (s *NezhaHandler) ReportSystemState(stream pb.NezhaService_ReportSystemStat
 		}
 
 		if err = stream.Send(&pb.Receipt{Proced: true}); err != nil {
+			if status.Code(err) == codes.Canceled || errors.Is(err, io.EOF) {
+				log.Printf("NEZHA>> ReportSystemState stream closed while sending ack, clientID: %d\n", clientID)
+				return nil
+			}
 			return err
 		}
 	}

@@ -55,7 +55,6 @@ export const getColumn = (servers: vps[]) => {
               mode="health"
               value={<AnimatedNumber value={healthScore} decimals={0} />}
               usagePercentage={healthScore}
-              textClassName="justify-end"
             />
           )
         },

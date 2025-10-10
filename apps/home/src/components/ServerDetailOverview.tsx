@@ -274,11 +274,21 @@ export default function ServerDetailOverview({ server_id }: { server_id: string 
                 <AccordionTrigger className="text-xs py-0 text-muted-foreground font-normal">{t("serverDetail.temperature")}</AccordionTrigger>
                 <AccordionContent className="pb-0">
                   <section className="flex items-start flex-wrap gap-2">
-                    {server?.state.temperatures.map((item, index) => (
-                      <div className="text-xs flex items-center" key={index}>
-                        <p className="font-semibold">{item.Name}</p>: {item.Temperature.toFixed(2)} °C
-                      </div>
-                    ))}
+                    {server?.state.temperatures.map((item, index) => {
+                      const rawName = (item as any)?.name ?? (item as any)?.Name
+                      const sensorName = typeof rawName === "string" && rawName.trim() ? rawName.trim() : `传感器${index + 1}`
+                      const rawTemp = (item as any)?.temperature ?? (item as any)?.Temperature
+                      const temperatureValue = typeof rawTemp === "number" ? rawTemp : Number.parseFloat(String(rawTemp ?? ""))
+                      if (!Number.isFinite(temperatureValue)) {
+                        return null
+                      }
+                      return (
+                        <div className="text-xs flex items-center" key={`${sensorName}-${index}`}>
+                          <p className="font-semibold mr-1">{sensorName}</p>
+                          {temperatureValue.toFixed(2)} °C
+                        </div>
+                      )
+                    })}
                   </section>
                 </AccordionContent>
               </AccordionItem>

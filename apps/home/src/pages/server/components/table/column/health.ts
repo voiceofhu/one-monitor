@@ -82,8 +82,25 @@ export const calculateHealthScore = (server: vps): number => {
   // 9. 温度评分 (如果有温度数据) - 权重动态调整
   let temperatureScore = 100
   let tempWeight = 0
-  if (server.state.temperatures && server.state.temperatures.length > 0) {
-    const maxTemp = Math.max(...server.state.temperatures)
+  const temperatureValues = Array.isArray(server.state.temperatures)
+    ? server.state.temperatures
+        .map((item) => {
+          if (typeof item === "number") {
+            return item
+          }
+          if (item && typeof (item as any).temperature === "number") {
+            return (item as any).temperature
+          }
+          if (item && typeof (item as any).Temperature === "number") {
+            return (item as any).Temperature
+          }
+          return Number.NaN
+        })
+        .filter((value) => Number.isFinite(value))
+    : []
+
+  if (temperatureValues.length > 0) {
+    const maxTemp = Math.max(...temperatureValues)
     temperatureScore = smoothScore(maxTemp, 40, 60, 75, 85)
     tempWeight = 0.05 // 5%
   }
@@ -138,7 +155,7 @@ export const calculateHealthScore = (server: vps): number => {
   const criticalMem = memUsage > 98
   const criticalDisk = diskUsage > 98
   const criticalLoad = loadRatio > 5.0
-  const criticalTemp = server.state.temperatures && Math.max(...server.state.temperatures) > 90
+  const criticalTemp = temperatureValues.length > 0 && Math.max(...temperatureValues) > 90
 
   const criticalCount = [criticalCpu, criticalMem, criticalDisk, criticalLoad, criticalTemp].filter(Boolean).length
 

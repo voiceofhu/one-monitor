@@ -69,7 +69,7 @@ export function Footer({ servers }: TableFooterProps) {
   }
 
   return (
-    <div className="bg-background  py-3">
+    <div className="bg-background py-3">
       {/* 桌面端：水平布局 */}
       <div className="hidden md:flex items-center justify-between">
         <div className="flex gap-6 items-center text-xs text-muted-foreground">
@@ -101,7 +101,10 @@ export function Footer({ servers }: TableFooterProps) {
         </div>
 
         <div className="text-xs text-muted-foreground">
-          {t("total_servers")}: <span className="font-mono font-medium"><AnimatedNumber value={servers.length} decimals={0} /></span>
+          {t("total_servers")}:{" "}
+          <span className="font-mono font-medium">
+            <AnimatedNumber value={servers.length} decimals={0} />
+          </span>
         </div>
       </div>
 
@@ -110,13 +113,16 @@ export function Footer({ servers }: TableFooterProps) {
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-foreground">{t("network_stats")}</h4>
           <span className="text-xs text-muted-foreground">
-            {t("total_servers")}: <span className="font-mono font-medium"><AnimatedNumber value={servers.length} decimals={0} /></span>
+            {t("total_servers")}:{" "}
+            <span className="font-mono font-medium">
+              <AnimatedNumber value={servers.length} decimals={0} />
+            </span>
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           {stats.map((stat, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50">
+            <div key={index} className="flex items-center gap-2 rounded-lg bg-secondary/50">
               {stat.type === "upload" ? (
                 <ArrowUp01 className="w-4 h-4 text-blue-500 flex-shrink-0" />
               ) : (

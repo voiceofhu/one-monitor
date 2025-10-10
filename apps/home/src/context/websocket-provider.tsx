@@ -14,26 +14,42 @@ interface WebSocketProviderProps {
 const MAX_HISTORY_RECORDS = 30
 const MAX_RECONNECT_ATTEMPTS = 30
 
-const normalizeTemperatures = (input?: NezhaServerStatus["temperatures"]): number[] => {
+const normalizeTemperatures = (input?: NezhaServerStatus["temperatures"]): State["temperatures"] => {
   if (!input || !Array.isArray(input)) {
     return []
   }
+
   return input
-    .map((item) => {
+    .map((item, index) => {
+      if (item == null) {
+        return null
+      }
+
       if (typeof item === "number") {
-        return item
-      }
-      if (item && typeof item === "object") {
-        if ("Temperature" in item && typeof item.Temperature === "number") {
-          return item.Temperature
-        }
-        if ("temperature" in item && typeof (item as any).temperature === "number") {
-          return (item as any).temperature
+        return {
+          name: `传感器${index + 1}`,
+          temperature: item,
         }
       }
-      return 0
+
+      if (typeof item === "object") {
+        const rawTemp = (item as any).Temperature ?? (item as any).temperature
+        const tempValue = typeof rawTemp === "number" ? rawTemp : Number.parseFloat(String(rawTemp ?? ""))
+        if (!Number.isFinite(tempValue)) {
+          return null
+        }
+        const rawName = (item as any).Name ?? (item as any).name
+        const name = typeof rawName === "string" && rawName.trim() ? rawName.trim() : `传感器${index + 1}`
+        return {
+          name,
+          temperature: tempValue,
+        }
+      }
+
+      return null
     })
-    .filter((value) => typeof value === "number")
+    .filter((entry): entry is NonNullable<State["temperatures"]>[number] => Boolean(entry))
+    .slice(0, 12)
 }
 
 const mapServerState = (state?: NezhaServerStatus): State => {
@@ -81,6 +97,7 @@ const normalizeServer = (server: NezhaServer): vps => {
       virtualization: host.virtualization,
       boot_time: host.boot_time,
       version: host.version,
+      country_code: host.country_code,
       mem_total: host.mem_total,
       disk_total: host.disk_total,
       swap_total: host.swap_total,

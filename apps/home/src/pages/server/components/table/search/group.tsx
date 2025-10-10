@@ -1,6 +1,8 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { fetchServerGroup } from "@/lib/nezha-api"
+import { cn } from "@/lib/utils"
 import { useStore } from "@/pages/server/store"
-import { useEffect } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 interface GroupFilterProps {
   variant?: "default" | "small"
@@ -8,41 +10,99 @@ interface GroupFilterProps {
 
 export function GroupFilter({ variant = "default" }: GroupFilterProps) {
   const { currentGroup, groups, setCurrentGroup, setGroups } = useStore()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const hasFetchedRef = useRef(false)
 
   // 初始化数据
   useEffect(() => {
-    if (!groups.length) {
-      setGroups([])
+    if (groups.length || hasFetchedRef.current) return
+    let cancelled = false
+    const loadGroups = async () => {
+      try {
+        setLoading(true)
+        hasFetchedRef.current = true
+        const response = await fetchServerGroup()
+        if (!response?.success) {
+          throw new Error("加载分组失败")
+        }
+        if (cancelled) return
+        const data = response.data ?? []
+        setGroups(data)
+        if (currentGroup) {
+          const stillExists = data.some((item) => item.group.id === currentGroup.group.id)
+          if (!stillExists) {
+            setCurrentGroup(null)
+          }
+        }
+        setError(null)
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "加载分组失败")
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
     }
-  }, [groups.length, setGroups])
+    void loadGroups()
+    return () => {
+      cancelled = true
+    }
+  }, [currentGroup, groups.length, setCurrentGroup, setGroups])
+
+  const handleRetry = () => {
+    hasFetchedRef.current = false
+    setError(null)
+    setGroups([])
+  }
 
   // 处理选择变化
   const handleValueChange = (value: string) => {
+    if (value === "retry") {
+      handleRetry()
+      return
+    }
+
     if (value === "all") {
-      // 清空选择
       setCurrentGroup(null)
       return
     }
 
-    const selectedGroup = [...[]].find((item) => item.group.name === value)
+    const selectedGroup = groups.find((item) => String(item.group.id) === value)
 
     if (selectedGroup) {
       setCurrentGroup(selectedGroup)
     }
   }
 
+  const triggerClassName = useMemo(
+    () =>
+      cn(
+        "w-auto min-w-[140px]",
+        variant === "small" ? "h-8 text-xs" : "h-9 text-sm",
+        loading ? "pointer-events-none opacity-70" : "",
+      ),
+    [variant, loading],
+  )
+
   return (
-    <Select value={currentGroup?.group.name || "all"} onValueChange={handleValueChange}>
-      <SelectTrigger size="sm" className="w-auto min-w-[120px]">
-        <SelectValue placeholder="请选择分组" />
+    <Select value={currentGroup ? String(currentGroup.group.id) : "all"} onValueChange={handleValueChange} disabled={loading && !groups.length}>
+      <SelectTrigger size="sm" className={triggerClassName}>
+        <SelectValue placeholder={loading ? "正在加载..." : error ? "加载失败，点击重试" : "选择分组"} />
       </SelectTrigger>
       <SelectContent>
-        {/* 添加清空选项 */}
         <SelectItem value="all">
-          <span className="">全部分组</span>
+          <span>全部分组</span>
         </SelectItem>
+        {error ? (
+          <SelectItem value="retry" className="text-rose-500">
+            重新加载分组
+          </SelectItem>
+        ) : null}
         {groups.map((group) => (
-          <SelectItem key={group.group.id || "all"} value={group.group.name}>
+          <SelectItem key={group.group.id} value={String(group.group.id)}>
             {group.group.name}
           </SelectItem>
         ))}

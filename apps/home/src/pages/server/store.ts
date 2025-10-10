@@ -12,8 +12,8 @@ type state = {
   groups: group[]
   currentGroup: group | null
   statusList: SelectItem[]
-  setStatus: (val: string) => void
-  setCurrentGroup: (val: group) => void
+  setStatus: (val: string | null) => void
+  setCurrentGroup: (val: group | null) => void
   setGroups: (val: group[]) => void
   setKeyword: (val: string) => void
 }

@@ -124,13 +124,13 @@ function MobileSearchDrawer({
               {/* 分组筛选 */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t("group")}</label>
-                <GroupFilter />
+                <GroupFilter variant="small" />
               </div>
 
               {/* 状态筛选 */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t("status")}</label>
-                <StateFilter />
+                <StateFilter variant="small" />
               </div>
             </div>
 
@@ -231,8 +231,8 @@ export function Header({
       <div className="hidden sm:flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-start">
         <div className="flex items-center gap-2">
           <Search table={table} />
-          <GroupFilter />
-          <StateFilter />
+          <GroupFilter variant="small" />
+          <StateFilter variant="small" />
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">

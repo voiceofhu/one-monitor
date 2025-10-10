@@ -1,5 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import { useStore } from "@/pages/server/store"
+import { useMemo } from "react"
 
 interface StateFilterProps {
   variant?: "default" | "small"
@@ -11,7 +13,6 @@ export function StateFilter({ variant = "default" }: StateFilterProps) {
   // 处理选择变化
   const handleValueChange = (value: string) => {
     if (value === "all") {
-      // 清空选择
       setStatus(null)
       return
     }
@@ -19,18 +20,22 @@ export function StateFilter({ variant = "default" }: StateFilterProps) {
     if (currentVal) setStatus(currentVal.value)
   }
 
+  const triggerClassName = useMemo(
+    () => cn("w-auto min-w-[140px]", variant === "small" ? "h-8 text-xs" : "h-9 text-sm"),
+    [variant],
+  )
+
   return (
     <Select value={status || "all"} onValueChange={handleValueChange}>
-      <SelectTrigger size="sm" className="w-auto min-w-[120px]">
-        <SelectValue placeholder="请选择分组" />
+      <SelectTrigger size="sm" className={triggerClassName}>
+        <SelectValue placeholder="全部状态" />
       </SelectTrigger>
       <SelectContent>
-        {/* 添加清空选项 */}
         <SelectItem value="all">
-          <span className="">全部状态</span>
+          <span>全部状态</span>
         </SelectItem>
         {statusList.map((status) => (
-          <SelectItem key={status.value || "all"} value={status.value}>
+          <SelectItem key={status.value} value={status.value}>
             {status.label}
           </SelectItem>
         ))}
