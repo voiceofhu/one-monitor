@@ -1,6 +1,6 @@
 import { TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getCommonPinningStyles } from "@/lib/utils"
-import { flexRender, type Table } from "@tanstack/react-table"
+import { type Table, flexRender } from "@tanstack/react-table"
 import { type ReactNode, type RefObject } from "react"
 
 import { vps } from "../../types"
@@ -15,7 +15,7 @@ interface TableViewProps {
 
 export function TableView({ table, tableContainerRef }: TableViewProps) {
   return (
-    <div ref={tableContainerRef} className="flex-1 overflow-auto relative">
+    <div ref={tableContainerRef} className="flex-1  overflow-auto relative">
       <table
         style={{
           width: table.getTotalSize(),

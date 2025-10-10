@@ -75,6 +75,7 @@ export function CardView({ servers }: { servers: vps[] }) {
             { label: "CPU", percentage: cpuUsage, detail: `${cpuUsage.toFixed(1)}%` },
             { label: "内存", percentage: memUsage, detail: memDetail },
             { label: "磁盘", percentage: diskUsage, detail: diskDetail },
+            { label: "磁盘", percentage: diskUsage, detail: diskDetail },
           ]
           if (swapTotal > 0) {
             metrics.push({ label: "交换分区", percentage: swapUsage, detail: swapDetail })
@@ -100,22 +101,22 @@ export function CardView({ servers }: { servers: vps[] }) {
                 </div>
 
                 <div className="rounded-2xl bg-muted/20  py-3 space-y-3 text-[11px]">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {metrics.map((metric) => (
+                      <MetricCard key={metric.label} label={`${metric.label}(${metric.detail})`} percentage={metric.percentage} />
+                    ))}
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <MetaInfo label="操作系统" value={osLabel} />
-                    <MetaInfo label="平均负载" value={loadSummary} detail={loadDetail} icon={<Gauge className="h-3.5 w-3.5" />} />
+                    <MetaInfo label="系统" value={osLabel} />
                     <MetaInfo
                       label="在线时间"
                       value={uptimeLabel}
                       icon={<Timer className="h-3.5 w-3.5" />}
                       valueClassName={isOnline ? "text-emerald-600" : "text-rose-500"}
                     />
-                    <MetaInfo label="CPU 核心" value={`${cpuCores}`} detail={server.host.arch || ""} />
                   </div>
-
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {metrics.map((metric) => (
-                      <MetricCard key={metric.label} {...metric} />
-                    ))}
+                  <div>
+                    <MetaInfo label="平均负载" detail={loadDetail} icon={<Gauge className="h-3.5 w-3.5" />} />
                   </div>
 
                   <TrafficBlock
@@ -138,7 +139,7 @@ export function CardView({ servers }: { servers: vps[] }) {
   )
 }
 
-function MetricCard({ label, percentage, detail }: { label: string; percentage: number; detail?: string }) {
+function MetricCard({ label, percentage }: { label: string; percentage: number; detail?: string }) {
   const safePercentage = Math.max(0, Math.min(100, Number.isFinite(percentage) ? percentage : 0))
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-primary/10 bg-primary/5 px-3 py-3 shadow-inner shadow-primary/10">
@@ -147,11 +148,11 @@ function MetricCard({ label, percentage, detail }: { label: string; percentage: 
       </div>
       <Progress
         usagePercentage={safePercentage}
-        size="sm"
+        size="md"
         value={<AnimatedNumber value={safePercentage} decimals={1} suffix="%" />}
         textClassName="justify-between text-[11px] px-0"
       />
-      {detail ? <span className="text-[10px] text-muted-foreground">{detail}</span> : null}
+      {/* {detail ? <span className="text-[10px] text-muted-foreground">{detail}</span> : null} */}
     </div>
   )
 }
@@ -176,7 +177,7 @@ function MetaInfo({
           {icon ? icon : null}
           {label}
         </span>
-        <span className={cn("text-[11px] font-semibold text-foreground", valueClassName)}>{value || "-"}</span>
+        <span className={cn("text-[11px] font-semibold text-foreground", valueClassName)}>{value || ""}</span>
       </div>
       {detail ? <div className="mt-1 text-[10px] text-muted-foreground/80">{detail}</div> : null}
     </div>
