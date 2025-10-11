@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -174,6 +175,7 @@ func (s *NezhaHandler) onReportSystemInfo(c context.Context, r *pb.Host) error {
 	}
 
 	server.Host = &host
+	maybeUpdateDefaultServerName(server)
 	singleton.NotifyServerInfoUpdate(server)
 	return nil
 }
@@ -244,8 +246,11 @@ func (s *NezhaHandler) ReportGeoIP(c context.Context, r *pb.GeoIP) (*pb.GeoIP, e
 		if ip == "" {
 			ip, _ = c.Value(model.CtxKeyConnectingIP{}).(string)
 		}
-		geoip.IP.IPv4Addr = ip
+		geoip.IP.IPv4Addr = sanitizeIPString(ip)
 	}
+
+	geoip.IP.IPv4Addr = sanitizeIPString(geoip.IP.IPv4Addr)
+	geoip.IP.IPv6Addr = sanitizeIPString(geoip.IP.IPv6Addr)
 
 	joinedIP := geoip.IP.Join()
 
@@ -284,22 +289,54 @@ func (s *NezhaHandler) ReportGeoIP(c context.Context, r *pb.GeoIP) (*pb.GeoIP, e
 	}
 
 	// 根据内置数据库查询 IP 地理位置
-	var ip string
-	if geoip.IP.IPv6Addr != "" && (use6 || geoip.IP.IPv4Addr == "") {
-		ip = geoip.IP.IPv6Addr
-	} else {
-		ip = geoip.IP.IPv4Addr
-	}
+	ip := selectLookupIP(geoip.IP, use6)
 
 	netIP := net.ParseIP(ip)
 	location, err := geoipx.Lookup(netIP)
 	if err != nil {
 		log.Printf("NEZHA>> geoip.Lookup: %v", err)
 	}
-	geoip.CountryCode = location
+	if location != "" {
+		geoip.CountryCode = strings.ToUpper(location)
+	} else if server.GeoIP != nil && server.GeoIP.CountryCode != "" {
+		geoip.CountryCode = server.GeoIP.CountryCode
+	}
 
 	// 将地区码写入到 Host
 	server.GeoIP = &geoip
+	if maybeUpdateDefaultServerName(server) {
+		singleton.NotifyServerInfoUpdate(server)
+	}
 
-	return &pb.GeoIP{Ip: nil, CountryCode: location, DashboardBootTime: singleton.DashboardBootTime}, nil
+	return &pb.GeoIP{Ip: nil, CountryCode: geoip.CountryCode, DashboardBootTime: singleton.DashboardBootTime}, nil
+}
+
+func sanitizeIPString(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	trimZone := func(ip string) string {
+		if idx := strings.Index(ip, "%"); idx >= 0 {
+			return ip[:idx]
+		}
+		return ip
+	}
+	if host, _, err := net.SplitHostPort(raw); err == nil {
+		return trimZone(host)
+	}
+	if strings.HasPrefix(raw, "[") && strings.HasSuffix(raw, "]") {
+		return trimZone(strings.TrimSuffix(strings.TrimPrefix(raw, "["), "]"))
+	}
+	return trimZone(raw)
+}
+
+func selectLookupIP(ip model.IP, preferIPv6 bool) string {
+	if preferIPv6 && ip.IPv6Addr != "" {
+		return ip.IPv6Addr
+	}
+	if ip.IPv4Addr != "" {
+		return ip.IPv4Addr
+	}
+	return ip.IPv6Addr
 }

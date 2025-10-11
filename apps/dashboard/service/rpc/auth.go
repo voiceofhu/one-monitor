@@ -2,13 +2,11 @@ package rpc
 
 import (
 	"context"
-	"strings"
-
-	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/hashicorp/go-uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"strings"
 
 	"github.com/nezhahq/nezha/model"
 	"github.com/nezhahq/nezha/service/singleton"
@@ -58,7 +56,7 @@ func (a *authHandler) Check(ctx context.Context) (uint64, error) {
 
 	clientID, hasID := singleton.ServerShared.UUIDToID(clientUUID)
 	if !hasID {
-		s := model.Server{UUID: clientUUID, Name: petname.Generate(2, "-"), Common: model.Common{
+		s := model.Server{UUID: clientUUID, Common: model.Common{
 			UserID: userId,
 		}}
 		if err := singleton.DB.Create(&s).Error; err != nil {

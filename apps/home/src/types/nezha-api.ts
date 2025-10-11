@@ -13,6 +13,7 @@ export interface NezhaServer {
   country_code?: string
   host: NezhaServerHost
   state?: NezhaServerStatus
+  geoip?: NezhaServerGeoIP
 }
 
 export interface NezhaServerHost {
@@ -47,6 +48,14 @@ export interface NezhaServerStatus {
   process_count?: number
   temperatures?: temperature[]
   gpu?: number[]
+}
+
+export interface NezhaServerGeoIP {
+  ip?: {
+    ipv4_addr?: string
+    ipv6_addr?: string
+  }
+  country_code?: string
 }
 
 interface temperature {

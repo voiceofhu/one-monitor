@@ -23,8 +23,8 @@ export function Progress({
   
   if (mode === "health") {
     // 健康值模式：值越高越健康
-    if (usagePercentage >= 70) status = "healthy"
-    else if (usagePercentage >= 30) status = "warning"
+    if (usagePercentage >= 85) status = "healthy"
+    else if (usagePercentage > 60) status = "warning"
     else status = "alarm"
   } else {
     // 使用率模式：值越高越危险

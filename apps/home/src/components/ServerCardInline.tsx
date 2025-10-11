@@ -15,7 +15,22 @@ import { Separator } from "./ui/separator"
 export default function ServerCardInline({ now, serverInfo }: { now: number; serverInfo: NezhaServer }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { name, country_code, online, cpu, up, down, mem, stg, platform, uptime, net_in_transfer, net_out_transfer, public_note } = formatNezhaInfo(
+  const {
+    name,
+    original_name,
+    country_code,
+    online,
+    cpu,
+    up,
+    down,
+    mem,
+    stg,
+    platform,
+    uptime,
+    net_in_transfer,
+    net_out_transfer,
+    public_note,
+  } = formatNezhaInfo(
     now,
     serverInfo,
   )
@@ -29,7 +44,9 @@ export default function ServerCardInline({ now, serverInfo }: { now: number; ser
 
   const customBackgroundImage = (window.CustomBackgroundImage as string) !== "" ? window.CustomBackgroundImage : undefined
 
-  const parsedData = parsePublicNote(public_note)
+  const parsedNote = parsePublicNote(public_note)
+  const structuredNote = parsedNote?.type === "structured" ? parsedNote.data : null
+  const publicNoteHtml = parsedNote?.type === "html" ? parsedNote.html : null
 
   return online ? (
     <section>
@@ -45,15 +62,17 @@ export default function ServerCardInline({ now, serverInfo }: { now: number; ser
         <section className={cn("grid items-center gap-2 lg:w-36")} style={{ gridTemplateColumns: "auto auto 1fr" }}>
           <span className="h-2 w-2 shrink-0 rounded-full bg-green-500 self-center"></span>
           <div className={cn("flex items-center justify-center", showFlag ? "min-w-[17px]" : "min-w-0")}>
-            {showFlag ? <ServerFlag country_code={country_code} /> : null}
-          </div>
+          {showFlag ? <ServerFlag country_code={country_code} /> : null}
+        </div>
           <div className="relative w-28 flex flex-col">
-            <p className={cn("break-normal font-bold tracking-tight", showFlag ? "text-xs " : "text-sm")}>{name}</p>
-            {parsedData?.billingDataMod && <BillingInfo parsedData={parsedData} />}
-          </div>
-        </section>
-        <Separator orientation="vertical" className="h-8 mx-0 ml-2" />
-        <div className="flex flex-col gap-1">
+            <p className={cn("break-normal font-bold tracking-tight", showFlag ? "text-xs " : "text-sm")} title={original_name || name}>
+              {name}
+            </p>
+          {structuredNote?.billingDataMod && <BillingInfo parsedData={structuredNote} />}
+        </div>
+      </section>
+      <Separator orientation="vertical" className="h-8 mx-0 ml-2" />
+      <div className="flex flex-col gap-1">
           <section className={cn("grid grid-cols-9 items-center gap-3 flex-1")}>
             <div className={"items-center flex flex-row gap-2 whitespace-nowrap"}>
               <div className="text-xs font-semibold">
@@ -112,7 +131,13 @@ export default function ServerCardInline({ now, serverInfo }: { now: number; ser
               <div className="flex items-center text-xs font-semibold">{formatBytes(net_in_transfer)}</div>
             </div>
           </section>
-          {parsedData?.planDataMod && <PlanInfo parsedData={parsedData} />}
+          {structuredNote?.planDataMod && <PlanInfo parsedData={structuredNote} />}
+          {publicNoteHtml ? (
+            <div
+              className="w-full text-[11px] leading-relaxed text-muted-foreground text-left"
+              dangerouslySetInnerHTML={{ __html: publicNoteHtml }}
+            />
+          ) : null}
         </div>
       </Card>
     </section>
@@ -132,12 +157,22 @@ export default function ServerCardInline({ now, serverInfo }: { now: number; ser
           {showFlag ? <ServerFlag country_code={country_code} /> : null}
         </div>
         <div className="relative flex flex-col">
-          <p className={cn("break-normal font-bold w-28 tracking-tight", showFlag ? "text-xs" : "text-sm")}>{name}</p>
-          {parsedData?.billingDataMod && <BillingInfo parsedData={parsedData} />}
+          <p className={cn("break-normal font-bold w-28 tracking-tight", showFlag ? "text-xs" : "text-sm")} title={original_name || name}>
+            {name}
+          </p>
+          {structuredNote?.billingDataMod && <BillingInfo parsedData={structuredNote} />}
         </div>
       </section>
       <Separator orientation="vertical" className="h-8 ml-3 lg:ml-1 mr-3" />
-      {parsedData?.planDataMod && <PlanInfo parsedData={parsedData} />}
+      <div className="flex flex-col gap-1 w-full max-w-full">
+        {structuredNote?.planDataMod && <PlanInfo parsedData={structuredNote} />}
+        {publicNoteHtml ? (
+          <div
+            className="w-full text-[11px] leading-relaxed text-muted-foreground text-left"
+            dangerouslySetInnerHTML={{ __html: publicNoteHtml }}
+          />
+        ) : null}
+      </div>
     </Card>
   )
 }

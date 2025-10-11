@@ -11,6 +11,7 @@ export interface group {
 export interface vps {
   id: number
   name: string
+  original_name?: string
   display_index?: number
   host: Host
   state: State

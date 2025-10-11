@@ -4,7 +4,6 @@ go 1.24.0
 
 require (
 	github.com/appleboy/gin-jwt/v2 v2.10.3
-	github.com/dustinkirkland/golang-petname v0.0.0-20240428194347-eebcea082ee0
 	github.com/gin-contrib/pprof v1.5.3
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-viper/mapstructure/v2 v2.2.1

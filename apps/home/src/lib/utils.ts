@@ -2,11 +2,11 @@ import { NezhaServer } from "@/types/nezha-api"
 import { Column } from "@tanstack/react-table"
 import { type ClassValue, clsx } from "clsx"
 import dayjs from "dayjs"
-import { CSSProperties } from "react"
-import { twMerge } from "tailwind-merge"
 import "dayjs/locale/zh-cn"
 import duration from "dayjs/plugin/duration"
 import relativeTime from "dayjs/plugin/relativeTime"
+import { CSSProperties } from "react"
+import { twMerge } from "tailwind-merge"
 
 dayjs.extend(duration)
 dayjs.extend(relativeTime)
@@ -90,6 +90,7 @@ export function formatNezhaInfo(now: number, serverInfo: NezhaServer) {
   const lastActiveTime = serverInfo.last_active.startsWith("000") ? 0 : parseISOTimestamp(serverInfo.last_active)
   return {
     ...serverInfo,
+    original_name: serverInfo.name,
     cpu: serverInfo.state.cpu || 0,
     gpu: serverInfo.state.gpu || [],
     process: serverInfo.state.process_count || 0,
@@ -125,85 +126,92 @@ export function formatNezhaInfo(now: number, serverInfo: NezhaServer) {
   }
 }
 
-export function getDaysBetweenDatesWithAutoRenewal({ autoRenewal, cycle, startDate, endDate }: BillingData): {
-  days: number
-  cycleLabel: string
-  remainingPercentage: number
-} {
-  let months = 1
-  // 套餐资费
-  let cycleLabel = cycle
-
-  switch (cycle.toLowerCase()) {
+export function resolveCycleInfo(cycle?: string | null): { months: number; label: string } {
+  if (!cycle) {
+    return { months: 0, label: "" }
+  }
+  const normalized = cycle.toLowerCase()
+  switch (normalized) {
     case "月":
     case "m":
     case "mo":
     case "month":
     case "monthly":
-      cycleLabel = "月"
-      months = 1
-      break
+      return { months: 1, label: "月" }
     case "年":
     case "y":
     case "yr":
     case "year":
     case "annual":
-      cycleLabel = "年"
-      months = 12
-      break
+      return { months: 12, label: "年" }
     case "季":
     case "q":
     case "qr":
     case "quarterly":
-      cycleLabel = "季"
-      months = 3
-      break
+      return { months: 3, label: "季" }
     case "半":
     case "半年":
     case "h":
     case "half":
     case "semi-annually":
-      cycleLabel = "半年"
-      months = 6
-      break
+      return { months: 6, label: "半年" }
     default:
-      cycleLabel = cycle
-      break
+      return { months: 0, label: cycle }
+  }
+}
+
+export function getDaysBetweenDatesWithAutoRenewal({ autoRenewal, cycle, startDate, endDate }: BillingData): {
+  days: number
+  cycleLabel: string
+  remainingPercentage: number
+} {
+  const { months, label } = resolveCycleInfo(cycle)
+  const cycleLabel = label
+  const start = startDate ? dayjs(startDate) : null
+  let effectiveEndDate = endDate
+  if ((!effectiveEndDate || !dayjs(effectiveEndDate).isValid()) && start && months > 0) {
+    effectiveEndDate = start.add(months, "month").format("YYYY-MM-DD")
+  }
+  if (!start || !start.isValid() || !effectiveEndDate || !dayjs(effectiveEndDate).isValid()) {
+    return {
+      days: 0,
+      cycleLabel,
+      remainingPercentage: 0,
+    }
   }
 
   const nowTime = new Date().getTime()
-  const endTime = dayjs(endDate).valueOf()
+  const nowIso = new Date(nowTime).toISOString()
+  const endDay = dayjs(effectiveEndDate)
+  const endTime = endDay.valueOf()
+  const remainingDays = getDaysBetweenDates(effectiveEndDate, nowIso)
+  const totalPeriodDays = Math.max(1, endDay.diff(start, "day") || 1)
 
-  if (autoRenewal !== "1") {
+  if (autoRenewal !== "1" || months <= 0) {
     return {
-      days: getDaysBetweenDates(endDate, new Date(nowTime).toISOString()),
-      cycleLabel: cycleLabel,
-      remainingPercentage:
-        getDaysBetweenDates(endDate, new Date(nowTime).toISOString()) / dayjs(endDate).diff(startDate, "day") > 1
-          ? 1
-          : getDaysBetweenDates(endDate, new Date(nowTime).toISOString()) / dayjs(endDate).diff(startDate, "day"),
+      days: remainingDays,
+      cycleLabel,
+      remainingPercentage: Math.min(1, Math.max(0, remainingDays) / totalPeriodDays),
     }
   }
 
   if (nowTime < endTime) {
     return {
-      days: getDaysBetweenDates(endDate, new Date(nowTime).toISOString()),
-      cycleLabel: cycleLabel,
-      remainingPercentage:
-        getDaysBetweenDates(endDate, new Date(nowTime).toISOString()) / (30 * months) > 1
-          ? 1
-          : getDaysBetweenDates(endDate, new Date(nowTime).toISOString()) / (30 * months),
+      days: remainingDays,
+      cycleLabel,
+      remainingPercentage: Math.min(1, Math.max(0, remainingDays) / totalPeriodDays),
     }
   }
 
   const nextTime = getNextCycleTime(endTime, months, nowTime)
   const diff = dayjs(nextTime).diff(dayjs(), "day") + 1
-  const remainingPercentage = diff / (30 * months) > 1 ? 1 : diff / (30 * months)
+  const cycleDurationDays = Math.max(1, dayjs(nextTime).diff(dayjs(nextTime).subtract(months, "month"), "day"))
+  const remainingPercentage = Math.min(1, Math.max(0, diff) / cycleDurationDays)
 
   return {
     days: diff,
-    cycleLabel: cycleLabel,
-    remainingPercentage: remainingPercentage,
+    cycleLabel,
+    remainingPercentage,
   }
 }
 
@@ -303,11 +311,16 @@ export function formatTime(timestamp: number): string {
 }
 
 interface BillingData {
-  startDate: string
-  endDate: string
-  autoRenewal: string
-  cycle: string
-  amount: string
+  startDate?: string
+  endDate?: string
+  autoRenewal?: string
+  cycle?: string
+  amount?: string
+  purchaseDate?: string
+  purchasePrice?: string
+  billingModel?: string
+  currency?: string
+  isFree?: boolean
 }
 
 interface PlanData {
@@ -325,62 +338,154 @@ export interface PublicNoteData {
   planDataMod?: PlanData
 }
 
-export function parsePublicNote(publicNote: string): PublicNoteData | null {
-  try {
-    if (!publicNote) {
-      return null
+export type ParsedPublicNote =
+  | {
+      type: "structured"
+      data: PublicNoteData
     }
-    const data = JSON.parse(publicNote)
-    if (!data.billingDataMod && !data.planDataMod) {
-      return null
-    }
-    if (data.billingDataMod && !data.planDataMod) {
-      return {
-        billingDataMod: {
-          startDate: data.billingDataMod.startDate || "",
-          endDate: data.billingDataMod.endDate,
-          autoRenewal: data.billingDataMod.autoRenewal || "",
-          cycle: data.billingDataMod.cycle || "",
-          amount: data.billingDataMod.amount || "",
-        },
-      }
-    }
-    if (!data.billingDataMod && data.planDataMod) {
-      return {
-        planDataMod: {
-          bandwidth: data.planDataMod.bandwidth || "",
-          trafficVol: data.planDataMod.trafficVol || "",
-          trafficType: data.planDataMod.trafficType || "",
-          IPv4: data.planDataMod.IPv4 || "",
-          IPv6: data.planDataMod.IPv6 || "",
-          networkRoute: data.planDataMod.networkRoute || "",
-          extra: data.planDataMod.extra || "",
-        },
-      }
+  | {
+      type: "html"
+      html: string
     }
 
-    return {
-      billingDataMod: {
-        startDate: data.billingDataMod.startDate || "",
-        endDate: data.billingDataMod.endDate,
-        autoRenewal: data.billingDataMod.autoRenewal || "",
-        cycle: data.billingDataMod.cycle || "",
-        amount: data.billingDataMod.amount || "",
-      },
-      planDataMod: {
-        bandwidth: data.planDataMod.bandwidth || "",
-        trafficVol: data.planDataMod.trafficVol || "",
-        trafficType: data.planDataMod.trafficType || "",
-        IPv4: data.planDataMod.IPv4 || "",
-        IPv6: data.planDataMod.IPv6 || "",
-        networkRoute: data.planDataMod.networkRoute || "",
-        extra: data.planDataMod.extra || "",
-      },
-    }
-  } catch (error) {
-    console.error("Error parsing public note:", error)
+function normalizeStructuredPublicNote(raw: unknown): PublicNoteData | null {
+  if (!raw || typeof raw !== "object") {
     return null
   }
+
+  const candidate = raw as {
+    billingDataMod?: Partial<BillingData>
+    planDataMod?: Partial<PlanData>
+  }
+
+  const hasBilling = Boolean(candidate.billingDataMod)
+  const hasPlan = Boolean(candidate.planDataMod)
+
+  if (!hasBilling && !hasPlan) {
+    return null
+  }
+
+  const result: PublicNoteData = {}
+
+  const toStringSafe = (value: unknown): string | undefined => {
+    if (value === null || value === undefined) {
+      return undefined
+    }
+    if (typeof value === "string") {
+      return value
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value)
+    }
+    return undefined
+  }
+
+  const toBooleanSafe = (value: unknown): boolean | undefined => {
+    if (typeof value === "boolean") {
+      return value
+    }
+    if (typeof value === "string") {
+      if (value.toLowerCase() === "true") return true
+      if (value.toLowerCase() === "false") return false
+    }
+    return undefined
+  }
+
+  if (hasBilling && candidate.billingDataMod) {
+    const billing = candidate.billingDataMod
+    result.billingDataMod = {
+      startDate: toStringSafe(billing.startDate),
+      endDate: toStringSafe(billing.endDate),
+      autoRenewal: toStringSafe(billing.autoRenewal),
+      cycle: toStringSafe(billing.cycle),
+      amount: toStringSafe(billing.amount),
+      billingModel: toStringSafe(billing.billingModel),
+      purchaseDate: toStringSafe(billing.purchaseDate ?? billing.startDate),
+      purchasePrice: toStringSafe(billing.purchasePrice ?? billing.amount),
+      currency: toStringSafe(billing.currency),
+      isFree: toBooleanSafe(billing.isFree),
+    }
+  }
+
+  if (hasPlan && candidate.planDataMod) {
+    const plan = candidate.planDataMod
+    result.planDataMod = {
+      bandwidth: toStringSafe(plan.bandwidth) ?? "",
+      trafficVol: toStringSafe(plan.trafficVol) ?? "",
+      trafficType: toStringSafe(plan.trafficType) ?? "",
+      IPv4: toStringSafe(plan.IPv4) ?? "",
+      IPv6: toStringSafe(plan.IPv6) ?? "",
+      networkRoute: toStringSafe(plan.networkRoute) ?? "",
+      extra: toStringSafe(plan.extra) ?? "",
+    }
+  }
+
+  return result
+}
+
+function sanitizePublicNoteHtml(html: string): string {
+  if (!html.trim()) {
+    return ""
+  }
+
+  if (typeof window === "undefined" || typeof window.DOMParser === "undefined") {
+    return html
+  }
+
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, "text/html")
+  const body = doc.body
+  if (!body) {
+    return ""
+  }
+  const removeSelectors = ["script", "style", "iframe", "object", "embed", "link"]
+  removeSelectors.forEach((selector) => {
+    body.querySelectorAll(selector).forEach((node) => node.remove())
+  })
+
+  const walker = doc.createTreeWalker(body, NodeFilter.SHOW_ELEMENT)
+  const disallowedProtocols = ["javascript:", "data:"]
+  while (walker.nextNode()) {
+    const element = walker.currentNode as Element
+    // Remove event handler attributes (on*)
+    for (const attr of Array.from(element.attributes)) {
+      if (attr.name.toLowerCase().startsWith("on")) {
+        element.removeAttribute(attr.name)
+        continue
+      }
+      if (["href", "src", "xlink:href"].includes(attr.name.toLowerCase())) {
+        const value = attr.value.trim().toLowerCase()
+        if (disallowedProtocols.some((protocol) => value.startsWith(protocol))) {
+          element.removeAttribute(attr.name)
+        }
+      }
+    }
+  }
+
+  return doc.body.innerHTML.trim()
+}
+
+export function parsePublicNote(publicNote: string): ParsedPublicNote | null {
+  const trimmed = (publicNote || "").trim()
+  if (!trimmed) {
+    return null
+  }
+
+  try {
+    const raw = JSON.parse(trimmed)
+    const structured = normalizeStructuredPublicNote(raw)
+    if (structured) {
+      return { type: "structured", data: structured }
+    }
+  } catch {
+    // Expected when content is HTML; continue to HTML fallback.
+  }
+
+  const sanitizedHtml = sanitizePublicNoteHtml(trimmed)
+  if (!sanitizedHtml) {
+    return null
+  }
+  return { type: "html", html: sanitizedHtml }
 }
 
 // Function to handle public_note with sessionStorage

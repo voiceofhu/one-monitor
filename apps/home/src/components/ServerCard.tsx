@@ -15,7 +15,21 @@ import { Card } from "./ui/card"
 export default function ServerCard({ now, serverInfo }: { now: number; serverInfo: NezhaServer }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { name, country_code, online, cpu, up, down, mem, stg, net_in_transfer, net_out_transfer, public_note, platform } = formatNezhaInfo(
+  const {
+    name,
+    original_name,
+    country_code,
+    online,
+    cpu,
+    up,
+    down,
+    mem,
+    stg,
+    net_in_transfer,
+    net_out_transfer,
+    public_note,
+    platform,
+  } = formatNezhaInfo(
     now,
     serverInfo,
   )
@@ -35,7 +49,9 @@ export default function ServerCard({ now, serverInfo }: { now: number; serverInf
   // @ts-expect-error FixedTopServerName is a global variable
   const fixedTopServerName = window.FixedTopServerName as boolean
 
-  const parsedData = parsePublicNote(public_note)
+  const parsedNote = parsePublicNote(public_note)
+  const structuredNote = parsedNote?.type === "structured" ? parsedNote.data : null
+  const publicNoteHtml = parsedNote?.type === "html" ? parsedNote.html : null
 
   return online ? (
     <Card
@@ -62,13 +78,15 @@ export default function ServerCard({ now, serverInfo }: { now: number; serverInf
           {showFlag ? <ServerFlag country_code={country_code} /> : null}
         </div>
         <div className="relative flex flex-col">
-          <p className={cn("break-normal font-bold tracking-tight", showFlag ? "text-xs " : "text-sm")}>{name}</p>
+          <p className={cn("break-normal font-bold tracking-tight", showFlag ? "text-xs " : "text-sm")} title={original_name || name}>
+            {name}
+          </p>
           <div
             className={cn("hidden lg:block", {
               "lg:hidden": fixedTopServerName,
             })}
           >
-            {parsedData?.billingDataMod && <BillingInfo parsedData={parsedData} />}
+            {structuredNote?.billingDataMod && <BillingInfo parsedData={structuredNote} />}
           </div>
         </div>
       </section>
@@ -77,7 +95,7 @@ export default function ServerCard({ now, serverInfo }: { now: number; serverInf
           "lg:flex": fixedTopServerName,
         })}
       >
-        {parsedData?.billingDataMod && <BillingInfo parsedData={parsedData} />}
+        {structuredNote?.billingDataMod && <BillingInfo parsedData={structuredNote} />}
       </div>
       <div className="flex flex-col lg:items-start items-center gap-2">
         <section
@@ -144,7 +162,13 @@ export default function ServerCard({ now, serverInfo }: { now: number; serverInf
             </Badge>
           </section>
         )}
-        {parsedData?.planDataMod && <PlanInfo parsedData={parsedData} />}
+        {structuredNote?.planDataMod && <PlanInfo parsedData={structuredNote} />}
+        {publicNoteHtml ? (
+          <div
+            className="w-full text-[11px] leading-relaxed text-muted-foreground text-left"
+            dangerouslySetInnerHTML={{ __html: publicNoteHtml }}
+          />
+        ) : null}
       </div>
     </Card>
   ) : (
@@ -173,13 +197,18 @@ export default function ServerCard({ now, serverInfo }: { now: number; serverInf
           {showFlag ? <ServerFlag country_code={country_code} /> : null}
         </div>
         <div className="relative flex flex-col">
-          <p className={cn("break-normal font-bold tracking-tight max-w-[108px]", showFlag ? "text-xs" : "text-sm")}>{name}</p>
+          <p
+            className={cn("break-normal font-bold tracking-tight max-w-[108px]", showFlag ? "text-xs" : "text-sm")}
+            title={original_name || name}
+          >
+            {name}
+          </p>
           <div
             className={cn("hidden lg:block", {
               "lg:hidden": fixedTopServerName,
             })}
           >
-            {parsedData?.billingDataMod && <BillingInfo parsedData={parsedData} />}
+            {structuredNote?.billingDataMod && <BillingInfo parsedData={structuredNote} />}
           </div>
         </div>
       </section>
@@ -188,9 +217,15 @@ export default function ServerCard({ now, serverInfo }: { now: number; serverInf
           "lg:flex": fixedTopServerName,
         })}
       >
-        {parsedData?.billingDataMod && <BillingInfo parsedData={parsedData} />}
+        {structuredNote?.billingDataMod && <BillingInfo parsedData={structuredNote} />}
       </div>
-      {parsedData?.planDataMod && <PlanInfo parsedData={parsedData} />}
+      {structuredNote?.planDataMod && <PlanInfo parsedData={structuredNote} />}
+      {publicNoteHtml ? (
+        <div
+          className="w-full text-[11px] leading-relaxed text-muted-foreground text-left"
+          dangerouslySetInnerHTML={{ __html: publicNoteHtml }}
+        />
+      ) : null}
     </Card>
   )
 }

@@ -2,11 +2,61 @@ import ServerFlag from "@/components/ServerFlag"
 import { AnimatedNumber } from "@/components/animated-number"
 import { cn, formatBytes, formatBytesWithUnifiedUnit } from "@/lib/utils"
 import { ArrowDownRight, ArrowUpRight, Gauge, Timer } from "lucide-react"
-import { type ReactNode } from "react"
+import { type CSSProperties, type ReactNode } from "react"
 
 import { vps } from "../../types"
 import { calculateHealthScore } from "./column/health"
 import { Progress } from "./progress"
+
+type CardToneState = "offline" | "danger" | "warning" | "healthy"
+
+type CardToneConfig = {
+  badgeClassName: string
+  badgeStyle?: CSSProperties
+  cardClassName: string
+  cardStyle?: CSSProperties
+  state: CardToneState
+}
+
+function resolveCardTone(isOnline: boolean, healthPercentage: number): CardToneConfig {
+  if (!isOnline) {
+    return {
+      badgeClassName: "bg-muted text-muted-foreground",
+      cardClassName: "border-border/40 bg-muted/40 text-muted-foreground/80 opacity-80",
+      state: "offline",
+    }
+  }
+
+  const safeHealth = Math.max(0, Math.min(100, healthPercentage))
+  const state: CardToneState = safeHealth <= 60 ? "danger" : safeHealth < 85 ? "warning" : "healthy"
+
+  const hue = (safeHealth / 100) * 120
+  const tintColor = `hsla(${hue}, 85%, 60%, 0.22)`
+  const backdropColor = `hsla(${hue}, 80%, 62%, 0.08)`
+  const borderColor = `hsla(${hue}, 75%, 45%, 0.45)`
+  const shadowStroke = `hsla(${hue}, 75%, 45%, 0.16)`
+  const gradientStop = Math.max(safeHealth, 10)
+  const gradientFadeStop = Math.min(gradientStop + 25, 100)
+
+  const badgeBackground = `hsla(${hue}, 85%, 62%, 0.18)`
+  const badgeTextColor = `hsla(${hue}, 85%, 28%, 0.95)`
+
+  return {
+    badgeClassName: "",
+    badgeStyle: {
+      backgroundColor: badgeBackground,
+      color: badgeTextColor,
+    },
+    cardClassName: "",
+    cardStyle: {
+      borderColor,
+      backgroundColor: backdropColor,
+      backgroundImage: `linear-gradient(135deg, ${tintColor} 0%, ${tintColor} ${gradientStop}%, transparent ${gradientFadeStop}%)`,
+      boxShadow: `inset 0 0 0 1px ${shadowStroke}`,
+    },
+    state,
+  }
+}
 
 export function CardView({ servers }: { servers: vps[] }) {
   if (!servers.length) {
@@ -45,9 +95,9 @@ export function CardView({ servers }: { servers: vps[] }) {
           const load1 = server.state.load_1 ?? 0
           const load5 = server.state.load_5 ?? 0
           const load15 = server.state.load_15 ?? 0
-          const cpuCores = server.host.cpu?.length || 1
-          const loadSummary = cpuCores > 0 ? `${load5.toFixed(2)} / ${cpuCores}` : load5.toFixed(2)
-          const loadDetail = `1m ${load1.toFixed(2)} · 5m ${load5.toFixed(2)} · 15m ${load15.toFixed(2)}`
+          // const cpuCores = server.host.cpu?.length || 1
+          // const loadSummary = cpuCores > 0 ? `${load5.toFixed(2)} / ${cpuCores}` : load5.toFixed(2)
+          const loadDetail = `${load1.toFixed(2)} · ${load5.toFixed(2)} ·  ${load15.toFixed(2)}`
 
           const healthScore = calculateHealthScore(server)
           const healthPercentage = Math.max(0, Math.min(100, healthScore))
@@ -59,23 +109,17 @@ export function CardView({ servers }: { servers: vps[] }) {
           const diskDetail = diskTotal > 0 ? `${diskUsedValue} / ${diskTotalValue} ${diskUnit}` : ""
           const platformLabel = [server.host.platform, server.host.platform_version].filter(Boolean).join(" ")
           const osLabel = [platformLabel, server.host.arch].filter(Boolean).join(" / ") || "-"
-          const statusTone = isOnline ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-500"
           const countryCode = (server.country_code || server.host.country_code || "").trim()
-          const healthHue = (healthPercentage / 100) * 120
-          const gradientStop = Math.max(healthPercentage, 10)
-          const gradientFadeStop = Math.min(gradientStop + 25, 100)
-          const tintColor = `hsla(${healthHue}, 85%, 60%, 0.22)`
-          const cardBorderColor = `hsla(${healthHue}, 70%, 45%, 0.35)`
-          const cardGradient = `linear-gradient(135deg, ${tintColor} 0%, ${tintColor} ${gradientStop}%, transparent ${gradientFadeStop}%)`
+          const cardTone = resolveCardTone(isOnline, healthPercentage)
 
           const temperatureReadings = normalizeTemperatures(server.state.temperatures)
           const hasTemperatures = temperatureReadings.length > 0
 
           const metrics: { label: string; percentage: number; detail?: string }[] = [
-            { label: "CPU", percentage: cpuUsage, detail: `${cpuUsage.toFixed(1)}%` },
+            { label: "CPU", percentage: cpuUsage },
             { label: "内存", percentage: memUsage, detail: memDetail },
             { label: "磁盘", percentage: diskUsage, detail: diskDetail },
-            { label: "磁盘", percentage: diskUsage, detail: diskDetail },
+            // { label: "磁盘", percentage: diskUsage, detail: diskDetail },
           ]
           if (swapTotal > 0) {
             metrics.push({ label: "交换分区", percentage: swapUsage, detail: swapDetail })
@@ -84,8 +128,10 @@ export function CardView({ servers }: { servers: vps[] }) {
           return (
             <div
               key={server.id}
-              className="h-full rounded-2xl border border-border/60 bg-background/60 p-3 transition-colors"
-              style={{ borderColor: cardBorderColor, backgroundImage: cardGradient }}
+              className={cn("h-full rounded-2xl border bg-background/60 p-3 transition-colors", cardTone.cardClassName)}
+              style={cardTone.cardStyle}
+              aria-disabled={!isOnline}
+              data-health-state={cardTone.state}
             >
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-2">
@@ -94,29 +140,33 @@ export function CardView({ servers }: { servers: vps[] }) {
                     <span className="truncate text-[12px] font-semibold leading-tight text-foreground">{server.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={cn("rounded-full px-2 py-1 text-[10px] font-medium leading-none", statusTone)}>
+                    <span
+                      className={cn("rounded-full px-2 py-1 text-[10px] font-medium leading-none", cardTone.badgeClassName)}
+                      style={cardTone.badgeStyle}
+                    >
                       {isOnline ? <AnimatedNumber value={healthScore} decimals={0} /> : "离线"}
                     </span>
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-muted/20  py-3 space-y-3 text-[11px]">
+                <div className="rounded-2xl bg-muted/10  py-2 space-y-2 text-[11px]">
                   <div className="grid gap-2 sm:grid-cols-2">
                     {metrics.map((metric) => (
-                      <MetricCard key={metric.label} label={`${metric.label}(${metric.detail})`} percentage={metric.percentage} />
+                      <MetricCard key={metric.label} label={`${metric.label}`} percentage={metric.percentage} detail={metric.detail} />
                     ))}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <MetaInfo label="系统" value={osLabel} />
+                    <MetaInfo label="系统" value="" detail={osLabel} />
                     <MetaInfo
                       label="在线时间"
-                      value={uptimeLabel}
+                      value=""
+                      detail={uptimeLabel}
                       icon={<Timer className="h-3.5 w-3.5" />}
                       valueClassName={isOnline ? "text-emerald-600" : "text-rose-500"}
                     />
                   </div>
                   <div>
-                    <MetaInfo label="平均负载" detail={loadDetail} icon={<Gauge className="h-3.5 w-3.5" />} />
+                    <MetaInfo label="平均负载" value={loadDetail} icon={<Gauge className="h-3.5 w-3.5" />} />
                   </div>
 
                   <TrafficBlock
@@ -139,12 +189,13 @@ export function CardView({ servers }: { servers: vps[] }) {
   )
 }
 
-function MetricCard({ label, percentage }: { label: string; percentage: number; detail?: string }) {
+function MetricCard({ label, percentage, detail }: { label: string; percentage: number; detail?: string }) {
   const safePercentage = Math.max(0, Math.min(100, Number.isFinite(percentage) ? percentage : 0))
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-primary/10 bg-primary/5 px-3 py-3 shadow-inner shadow-primary/10">
+    <div className="flex flex-col gap-1 rounded-xl border border-primary/4 bg-primary/2 px-3 py-3 shadow-inner shadow-primary/10">
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span className="font-medium uppercase tracking-wide">{label}</span>
+        {detail ? <span className="text-[10px] text-muted-foreground">{detail}</span> : null}
       </div>
       <Progress
         usagePercentage={safePercentage}
@@ -152,7 +203,6 @@ function MetricCard({ label, percentage }: { label: string; percentage: number; 
         value={<AnimatedNumber value={safePercentage} decimals={1} suffix="%" />}
         textClassName="justify-between text-[11px] px-0"
       />
-      {/* {detail ? <span className="text-[10px] text-muted-foreground">{detail}</span> : null} */}
     </div>
   )
 }

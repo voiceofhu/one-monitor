@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react"
-
 import { fetchServerList } from "@/lib/nezha-api"
-import type { NezhaServer, NezhaServerStatus, ServerDeltaUpdate } from "@/types/nezha-api"
 import type { State, vps } from "@/pages/server/types"
+import type { NezhaServer, NezhaServerStatus, ServerDeltaUpdate } from "@/types/nezha-api"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { WebSocketContext, WebSocketContextType } from "./websocket-context"
 
@@ -82,9 +81,12 @@ const mapServerState = (state?: NezhaServerStatus): State => {
 
 const normalizeServer = (server: NezhaServer): vps => {
   const host = server.host ?? {}
+  const ipv4Address = server.geoip?.ip?.ipv4_addr ?? ""
+
   return {
     id: server.id,
     name: server.name,
+    original_name: server.name,
     display_index: server.display_index,
     public_note: server.public_note ?? "",
     last_active: server.last_active,
@@ -97,10 +99,11 @@ const normalizeServer = (server: NezhaServer): vps => {
       virtualization: host.virtualization,
       boot_time: host.boot_time,
       version: host.version,
-      country_code: host.country_code,
+      country_code: server.country_code,
       mem_total: host.mem_total,
       disk_total: host.disk_total,
       swap_total: host.swap_total,
+      ip: ipv4Address,
       gpu: host.gpu ?? [],
     },
     state: mapServerState(server.state),
@@ -202,9 +205,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ url, child
           const info = update.data
           const existing = nextMap.get(info.id)
           if (existing) {
+            const updatedOriginalName = info.name ?? existing.original_name ?? existing.name
             nextMap.set(info.id, {
               ...existing,
-              name: info.name ?? existing.name,
+              original_name: updatedOriginalName,
               public_note: info.public_note ?? existing.public_note,
               display_index: info.display_index ?? existing.display_index,
             })

@@ -1,5 +1,4 @@
 import ServerFlag from "@/components/ServerFlag"
-import { cn } from "@/lib/utils"
 import { useStore } from "@/pages/server/store"
 import dayjs from "dayjs"
 import { Link } from "react-router-dom"
@@ -171,8 +170,8 @@ export function InfoHoverCard({ data }: { data: vps }) {
         </span>
         <div className="flex items-center text-foreground font-medium truncate text-xs underline-hover gap-0.5">
           {Icon && Icon}
-          <ServerFlag country_code={data.country_code!} className="" />
-          <div>
+          <ServerFlag country_code={(data.country_code || data.host?.country_code || "").toUpperCase()} className="" />
+          <div title={data.original_name || data.name}>
             <HighlightText text={data.name} searchKeyword={keyword} />
           </div>
         </div>
