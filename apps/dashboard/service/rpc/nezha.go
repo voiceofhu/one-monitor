@@ -316,19 +316,12 @@ func sanitizeIPString(raw string) string {
 	if raw == "" {
 		return ""
 	}
-	trimZone := func(ip string) string {
-		if idx := strings.Index(ip, "%"); idx >= 0 {
-			return ip[:idx]
-		}
-		return ip
-	}
 	if host, _, err := net.SplitHostPort(raw); err == nil {
-		return trimZone(host)
+		raw = host
+	} else if strings.HasPrefix(raw, "[") && strings.Contains(raw, "]") {
+		raw = strings.TrimSuffix(strings.TrimPrefix(raw, "["), "]")
 	}
-	if strings.HasPrefix(raw, "[") && strings.HasSuffix(raw, "]") {
-		return trimZone(strings.TrimSuffix(strings.TrimPrefix(raw, "["), "]"))
-	}
-	return trimZone(raw)
+	return sanitizeRawIP(raw)
 }
 
 func selectLookupIP(ip model.IP, preferIPv6 bool) string {

@@ -207,6 +207,7 @@ func firstIPv6Segment(input string) string {
 func sanitizeRawIP(raw string) string {
 	raw = strings.TrimSpace(raw)
 	raw = strings.TrimPrefix(raw, "ip:")
+	raw = strings.TrimPrefix(raw, "IP:")
 	raw = strings.Trim(raw, "[]")
 	if idx := strings.Index(raw, "%"); idx >= 0 {
 		raw = raw[:idx]
