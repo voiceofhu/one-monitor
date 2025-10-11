@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -152,17 +153,63 @@ func calculateMemoryInGB(memBytes uint64) int {
 }
 
 func extractIPSegment(ip model.IP) string {
-	if v4 := strings.TrimSpace(ip.IPv4Addr); v4 != "" {
-		if idx := strings.Index(v4, "."); idx > 0 {
-			return v4[:idx]
-		}
-		return v4
+	if seg := firstIPv4Segment(ip.IPv4Addr); seg != "" {
+		return seg
 	}
-	if v6 := strings.TrimSpace(ip.IPv6Addr); v6 != "" {
-		if idx := strings.Index(v6, ":"); idx > 0 {
-			return strings.ToUpper(v6[:idx])
-		}
-		return strings.ToUpper(v6)
+	if seg := firstIPv6Segment(ip.IPv6Addr); seg != "" {
+		return seg
+	}
+	joined := strings.TrimSpace(ip.Join())
+	if seg := firstIPv4Segment(joined); seg != "" {
+		return seg
+	}
+	if seg := firstIPv6Segment(joined); seg != "" {
+		return seg
 	}
 	return ""
+}
+
+func firstIPv4Segment(input string) string {
+	if input = sanitizeRawIP(input); input == "" {
+		return ""
+	}
+	if ip := net.ParseIP(input); ip != nil {
+		if v4 := ip.To4(); v4 != nil {
+			return strconv.Itoa(int(v4[0]))
+		}
+	}
+	if idx := strings.Index(input, "."); idx > 0 {
+		return input[:idx]
+	}
+	return ""
+}
+
+func firstIPv6Segment(input string) string {
+	if input = sanitizeRawIP(input); input == "" {
+		return ""
+	}
+	lowered := strings.ToLower(input)
+	if strings.HasPrefix(lowered, "::ffff:") {
+		if seg := firstIPv4Segment(input[len("::ffff:"):]); seg != "" {
+			return seg
+		}
+	}
+	if idx := strings.Index(input, ":"); idx > 0 {
+		return strings.ToUpper(input[:idx])
+	}
+	if ip := net.ParseIP(input); ip != nil && ip.To16() != nil {
+		parts := strings.SplitN(strings.ToUpper(input), ":", 2)
+		return parts[0]
+	}
+	return ""
+}
+
+func sanitizeRawIP(raw string) string {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimPrefix(raw, "ip:")
+	raw = strings.Trim(raw, "[]")
+	if idx := strings.Index(raw, "%"); idx >= 0 {
+		raw = raw[:idx]
+	}
+	return raw
 }

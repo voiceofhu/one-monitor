@@ -170,10 +170,10 @@ export function CardView({ servers }: { servers: vps[] }) {
                   </div>
 
                   <TrafficBlock
-                    netInSpeed={`${netInSpeed}/s`}
-                    netOutSpeed={`${netOutSpeed}/s`}
-                    netInTransfer={netInTransfer}
-                    netOutTransfer={netOutTransfer}
+                    uploadSpeed={`${netOutSpeed}/s`}
+                    downloadSpeed={`${netInSpeed}/s`}
+                    uploadTransfer={netOutTransfer}
+                    downloadTransfer={netInTransfer}
                   />
 
                   {hasTemperatures ? <TemperatureBlock temperatures={temperatureReadings} /> : null}
@@ -235,30 +235,30 @@ function MetaInfo({
 }
 
 function TrafficBlock({
-  netInSpeed,
-  netOutSpeed,
-  netInTransfer,
-  netOutTransfer,
+  uploadSpeed,
+  downloadSpeed,
+  uploadTransfer,
+  downloadTransfer,
 }: {
-  netInSpeed: string
-  netOutSpeed: string
-  netInTransfer: string
-  netOutTransfer: string
+  uploadSpeed: string
+  downloadSpeed: string
+  uploadTransfer: string
+  downloadTransfer: string
 }) {
   return (
     <div className="rounded-xl border border-primary/10 bg-primary/5 px-3 py-2 text-[11px]">
       <div className="flex gap-2 items-center justify-between text-muted-foreground">
         <span>实时网络</span>
         <span className="flex flex-1 justify-between items-center gap-2 font-medium text-[11px]">
-          {renderDirectionalValue(netInSpeed, "up")}
-          {renderDirectionalValue(netOutSpeed, "down")}
+          {renderDirectionalValue(uploadSpeed, "up")}
+          {renderDirectionalValue(downloadSpeed, "down")}
         </span>
       </div>
       <div className="mt-1.5 flex gap-2 items-center justify-between text-muted-foreground">
         <span>累计流量</span>
         <span className="flex flex-1 justify-between items-center gap-2 font-medium text-[11px]">
-          {renderDirectionalValue(netInTransfer, "up")}
-          {renderDirectionalValue(netOutTransfer, "down")}
+          {renderDirectionalValue(uploadTransfer, "up")}
+          {renderDirectionalValue(downloadTransfer, "down")}
         </span>
       </div>
     </div>

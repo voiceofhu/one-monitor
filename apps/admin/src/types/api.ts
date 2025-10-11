@@ -503,6 +503,8 @@ export interface ModelServer {
     hide_for_guest: boolean
     host: ModelHost
     id: number
+    account?: string
+    expired_at?: string
     last_active: string
     name: string
     /** 管理员可见备注 */
@@ -532,6 +534,8 @@ export interface ModelServerForm {
     enable_ddns?: boolean
     /** 对游客隐藏 */
     hide_for_guest?: boolean
+    account?: string
+    expired_at?: string
     name: string
     /** 管理员可见备注 */
     note?: string

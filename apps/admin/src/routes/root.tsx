@@ -12,9 +12,9 @@ export default function Root() {
     const { t } = useTranslation()
     const { data: settingData, error } = useSetting()
 
-    useEffect(() => {
-        document.title = settingData?.config?.site_name || "哪吒监控 Nezha Monitoring"
-    }, [settingData?.config?.site_name])
+    // useEffect(() => {
+    //     document.title = settingData?.config?.site_name || "哪吒监控 Nezha Monitoring"
+    // }, [settingData?.config?.site_name])
 
     useEffect(() => {
         if (settingData?.config?.custom_code_dashboard) {

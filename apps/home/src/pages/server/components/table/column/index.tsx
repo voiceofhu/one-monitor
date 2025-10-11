@@ -23,13 +23,13 @@ export const getColumn = (servers: vps[]) => {
   const max_net_in_out_speed = 1024 * 1024 * 1024 * 1024 * 10
   const max_net_in_out_transfer = 1024 * 1024 * 1024 * 1024 * 1024 * 10
   const max_data = () => ({
-    max_in_speed: Math.max(...servers.map((s) => s.state.net_in_speed || 0), max_net_in_out_speed),
-    max_out_speed: Math.max(...servers.map((s) => s.state.net_out_speed || 0), max_net_in_out_speed),
-    max_in_transfer: Math.max(...servers.map((s) => s.state.net_in_transfer || 0), max_net_in_out_transfer),
-    max_out_transfer: Math.max(...servers.map((s) => s.state.net_out_transfer || 0), max_net_in_out_transfer),
+    max_upload_speed: Math.max(...servers.map((s) => s.state.net_out_speed || 0), max_net_in_out_speed),
+    max_download_speed: Math.max(...servers.map((s) => s.state.net_in_speed || 0), max_net_in_out_speed),
+    max_download_transfer: Math.max(...servers.map((s) => s.state.net_in_transfer || 0), max_net_in_out_transfer),
+    max_upload_transfer: Math.max(...servers.map((s) => s.state.net_out_transfer || 0), max_net_in_out_transfer),
   })
   // 优化：使用 useMemo 缓存计算结果
-  const { max_in_speed, max_out_speed, max_in_transfer, max_out_transfer } = max_data()
+  const { max_upload_speed, max_download_speed, max_download_transfer, max_upload_transfer } = max_data()
 
   return [
     columnHelper.accessor("name", {
@@ -147,24 +147,24 @@ export const getColumn = (servers: vps[]) => {
       size: 132,
       enableSorting: true, // 不可排序
     }),
-    columnHelper.accessor("state.net_in_speed", {
+    columnHelper.accessor("state.net_out_speed", {
       header: () => <span className="text-xs">传输速率(上传)</span>,
       cell: (info) => {
-        const inspeed = info.row.original.state.net_in_speed || 0
-        const usageInPercentage = max_in_speed > 0 ? (inspeed / max_in_speed) * 100 : 0
-        const { value: numericValue, unit } = formatBytesNumeric(inspeed)
-        return <Progress value={<AnimatedNumber value={numericValue} decimals={2} suffix={` ${unit}/s`} />} usagePercentage={usageInPercentage} />
+        const outSpeed = info.row.original.state.net_out_speed || 0
+        const usagePercentage = max_upload_speed > 0 ? (outSpeed / max_upload_speed) * 100 : 0
+        const { value: numericValue, unit } = formatBytesNumeric(outSpeed)
+        return <Progress value={<AnimatedNumber value={numericValue} decimals={2} suffix={` ${unit}/s`} />} usagePercentage={usagePercentage} />
       },
       size: 120,
       enableSorting: true, // 可以排序
     }),
-    columnHelper.accessor("state.net_out_speed", {
+    columnHelper.accessor("state.net_in_speed", {
       header: () => <span className="text-xs">传输速率(下载)</span>,
       cell: (info) => {
-        const outspeed = info.row.original.state.net_out_speed || 0
-        const usageOutPercentage = max_out_speed > 0 ? (outspeed / max_out_speed) * 100 : 0
-        const { value: numericValue, unit } = formatBytesNumeric(outspeed)
-        return <Progress value={<AnimatedNumber value={numericValue} decimals={2} suffix={` ${unit}/s`} />} usagePercentage={usageOutPercentage} />
+        const inSpeed = info.row.original.state.net_in_speed || 0
+        const usagePercentage = max_download_speed > 0 ? (inSpeed / max_download_speed) * 100 : 0
+        const { value: numericValue, unit } = formatBytesNumeric(inSpeed)
+        return <Progress value={<AnimatedNumber value={numericValue} decimals={2} suffix={` ${unit}/s`} />} usagePercentage={usagePercentage} />
       },
       size: 120,
       enableSorting: true, // 可以排序
@@ -174,7 +174,7 @@ export const getColumn = (servers: vps[]) => {
       size: 110,
       cell: (info) => {
         const inspeed = info.row.original.state.net_in_transfer || 0
-        const usageInPercentage = max_in_transfer > 0 ? (inspeed / max_in_transfer) * 100 : 0
+        const usageInPercentage = max_download_transfer > 0 ? (inspeed / max_download_transfer) * 100 : 0
         const { value: numericValue, unit } = formatBytesNumeric(inspeed)
         return <Progress value={<AnimatedNumber value={numericValue} decimals={2} suffix={` ${unit}`} />} usagePercentage={usageInPercentage} />
       },
@@ -184,7 +184,7 @@ export const getColumn = (servers: vps[]) => {
       size: 110,
       cell: (info) => {
         const outspeed = info.row.original.state.net_out_transfer || 0
-        const usageOutPercentage = max_out_transfer > 0 ? (outspeed / max_out_transfer) * 100 : 0
+        const usageOutPercentage = max_upload_transfer > 0 ? (outspeed / max_upload_transfer) * 100 : 0
         const { value: numericValue, unit } = formatBytesNumeric(outspeed)
         return <Progress value={<AnimatedNumber value={numericValue} decimals={2} suffix={` ${unit}`} />} usagePercentage={usageOutPercentage} />
       },

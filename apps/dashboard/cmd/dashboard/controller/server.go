@@ -76,6 +76,8 @@ func updateServer(c *gin.Context) (any, error) {
 	s.DisplayIndex = sf.DisplayIndex
 	s.Note = sf.Note
 	s.PublicNote = sf.PublicNote
+	s.Account = sf.Account
+	s.ExpiredAt = sf.ExpiredAt
 	s.HideForGuest = sf.HideForGuest
 	s.EnableDDNS = sf.EnableDDNS
 	s.DDNSProfiles = sf.DDNSProfiles
