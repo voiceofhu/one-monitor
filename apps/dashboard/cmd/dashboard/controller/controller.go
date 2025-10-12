@@ -18,15 +18,17 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/swaggo/swag/example/basic/docs"
 
 	"github.com/nezhahq/nezha/cmd/dashboard/controller/waf"
-	docs "github.com/nezhahq/nezha/cmd/dashboard/docs"
+	// docs "github.com/nezhahq/nezha/cmd/dashboard/docs"
 	"github.com/nezhahq/nezha/model"
 	"github.com/nezhahq/nezha/pkg/utils"
 	"github.com/nezhahq/nezha/service/singleton"
 )
 
 func ServeWeb() http.Handler {
+	// 初始化 Gin 与公共中间件，返回给主程序挂载
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
@@ -49,6 +51,7 @@ func ServeWeb() http.Handler {
 }
 
 func routers(r *gin.Engine) {
+	// 所有 REST/WebSocket 路由在此定义，并根据认证情况拆分不同分组
 	authMiddleware, err := jwt.New(initParams())
 	if err != nil {
 		log.Fatal("JWT Error:" + err.Error())
@@ -157,6 +160,7 @@ func routers(r *gin.Engine) {
 }
 
 func recordPath(c *gin.Context) {
+	// 记录被匹配的路由模板，方便中间件或日志引用
 	url := c.Request.URL.String()
 	for _, p := range c.Params {
 		url = strings.Replace(url, p.Value, ":"+p.Key, 1)
@@ -211,12 +215,14 @@ func (we *wsError) Error() string {
 var errNoop = errors.New("wrote")
 
 func commonHandler[T any](handler handlerFunc[T]) func(*gin.Context) {
+	// 包装通用处理函数，统一返回模型化响应结构
 	return func(c *gin.Context) {
 		handle(c, handler)
 	}
 }
 
 func adminHandler[T any](handler handlerFunc[T]) func(*gin.Context) {
+	// 仅管理员可访问的 API，权限不足时返回统一错误
 	return func(c *gin.Context) {
 		auth, ok := c.Get(model.CtxKeyAuthorizedUser)
 		if !ok {
@@ -235,6 +241,7 @@ func adminHandler[T any](handler handlerFunc[T]) func(*gin.Context) {
 }
 
 func handle[T any](c *gin.Context, handler handlerFunc[T]) {
+	// 核心响应包装逻辑：成功返回数据，错误统一转为 CommonResponse
 	data, err := handler(c)
 	if err == nil {
 		c.JSON(http.StatusOK, model.CommonResponse[T]{Success: true, Data: data})
@@ -260,6 +267,7 @@ func handle[T any](c *gin.Context, handler handlerFunc[T]) {
 }
 
 func listHandler[S ~[]E, E model.CommonInterface](handler handlerFunc[S]) func(*gin.Context) {
+	// 针对列表接口的工具：处理权限过滤并返回数组数据
 	return func(c *gin.Context) {
 		data, err := handler(c)
 		if err != nil {
@@ -273,6 +281,7 @@ func listHandler[S ~[]E, E model.CommonInterface](handler handlerFunc[S]) func(*
 }
 
 func pCommonHandler[S ~[]E, E any](handler pHandlerFunc[S, E]) func(*gin.Context) {
+	// 支持分页的接口包装
 	return func(c *gin.Context) {
 		data, err := handler(c)
 		if err != nil {

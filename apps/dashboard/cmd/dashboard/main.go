@@ -28,7 +28,7 @@ import (
 )
 
 type DashboardCliParam struct {
-	Version          bool   // 当前版本号
+	Version          bool   // 是否仅输出版本号
 	ConfigFile       string // 配置文件路径
 	DatabaseLocation string // Sqlite3 数据库文件路径
 }
@@ -38,7 +38,7 @@ var (
 )
 
 func initSystem(bus chan<- *model.Service) error {
-	// 初始化管理员账户
+	// 初始化管理员账户，防止空库无法登录
 	var usersCount int64
 	if err := singleton.DB.Model(&model.User{}).Count(&usersCount).Error; err != nil {
 		return err
@@ -57,17 +57,17 @@ func initSystem(bus chan<- *model.Service) error {
 		}
 	}
 
-	// 启动 singleton 包下的所有服务
+	// 启动 singleton 包下的所有服务（调度、告警、缓存等）
 	if err := singleton.LoadSingleton(bus); err != nil {
 		return err
 	}
 
-	// 每天的3:30 对 监控记录 和 流量记录 进行清理
+	// 每天清理历史监控记录
 	if _, err := singleton.CronShared.AddFunc("0 30 3 * * *", singleton.CleanServiceHistory); err != nil {
 		return err
 	}
 
-	// 每小时对流量记录进行打点
+	// 每小时汇总一次流量快照
 	if _, err := singleton.CronShared.AddFunc("0 0 * * * *", func() { singleton.RecordTransferHourlyUsage() }); err != nil {
 		return err
 	}
@@ -106,8 +106,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	serviceSentinelDispatchBus := make(chan *model.Service) // 用于传递服务监控任务信息的channel
-	// 初始化 dao 包
+	serviceSentinelDispatchBus := make(chan *model.Service) // service -> agent 调度队列
+	// 依次初始化模板、配置、时区缓存、数据库以及业务单例
 	if err := utils.FirstError(singleton.InitFrontendTemplates,
 		func() error { return singleton.InitConfigFromPath(dashboardCliParam.ConfigFile) },
 		singleton.InitTimezoneAndCache,
@@ -116,13 +116,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", singleton.Conf.ListenHost, singleton.Conf.ListenPort))
+	l, err := net.Listen("tcp", fmt.Sprintf("%s:%d", singleton.Conf.ListenHost, singleton.Conf.ListenPort)) // 复用 HTTP/GRPC 端口
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	singleton.CleanServiceHistory()
-	rpc.DispatchKeepalive()
+	rpc.DispatchKeepalive() // 定时给 Agent 发送保活任务
 	go rpc.DispatchTask(serviceSentinelDispatchBus)
 	go singleton.AlertSentinelStart()
 
@@ -131,7 +131,7 @@ func main() {
 	controller.InitUpgrader()
 	controller.InitWebSocketManager() // 初始化WebSocket管理器
 
-	muxHandler := newHTTPandGRPCMux(httpHandler, grpcHandler)
+	muxHandler := newHTTPandGRPCMux(httpHandler, grpcHandler) // 自定义多路复用器，按请求类型分发
 	muxServerHTTP := &http.Server{
 		Handler:           muxHandler,
 		ReadHeaderTimeout: time.Second * 5,
@@ -189,6 +189,7 @@ func main() {
 
 func newHTTPandGRPCMux(httpHandler http.Handler, grpcHandler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 1. 如果命中 NAT 域名，交给 Agent 做内网穿透
 		natConfig := singleton.NATShared.GetNATConfigByDomain(r.Host)
 		if natConfig != nil {
 			if !natConfig.Enabled {
@@ -199,11 +200,13 @@ func newHTTPandGRPCMux(httpHandler http.Handler, grpcHandler http.Handler) http.
 			rpc.ServeNAT(w, r, natConfig)
 			return
 		}
+		// 2. 按 gRPC 请求特征转发给 gRPC Server
 		if r.ProtoMajor == 2 && r.Header.Get("Content-Type") == "application/grpc" &&
 			strings.HasPrefix(r.URL.Path, "/"+proto.NezhaService_ServiceDesc.ServiceName) {
 			grpcHandler.ServeHTTP(w, r)
 			return
 		}
+		// 3. 其余走 HTTP Web 面板
 		httpHandler.ServeHTTP(w, r)
 	})
 }

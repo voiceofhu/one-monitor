@@ -47,26 +47,26 @@ import (
 )
 
 var (
-	version               = monitor.Version // 来自于 GoReleaser 的版本号
+	version               = monitor.Version // 编译时注入的 Agent 版本号，用于自更新判断
 	arch                  string
 	executablePath        string
-	defaultConfigPath     = loadDefaultConfigPath()
-	client                pb.NezhaServiceClient
-	initialized           bool
-	agentConfig           model.AgentConfig
-	prevDashboardBootTime uint64 // 面板上次启动时间
-	geoipReported         bool   // 在面板重启后是否上报成功过 GeoIP
-	lastReportHostInfo    time.Time
-	lastReportIPInfo      time.Time
+	defaultConfigPath     = loadDefaultConfigPath() // 默认从可执行文件同目录读取配置
+	client                pb.NezhaServiceClient     // 和面板交互的 gRPC 客户端
+	initialized           bool                      // 是否已完成初次注册（握手）
+	agentConfig           model.AgentConfig         // 当前运行时配置快照
+	prevDashboardBootTime uint64                    // 面板上次启动时间戳，用来判断面板是否重启
+	geoipReported         bool                      // 是否成功上报过 GeoIP 数据（用于重试控制）
+	lastReportHostInfo    time.Time                 // 最近一次上报主机硬件信息时间
+	lastReportIPInfo      time.Time                 // 最近一次上报 IP 信息时间
 
-	hostStatus            atomic.Bool
-	ipStatus              atomic.Bool
-	reloadStatus          atomic.Bool
-	lastReportedStateMu   sync.Mutex
+	hostStatus            atomic.Bool // 控制一次只允许一个主机信息采集协程运行
+	ipStatus              atomic.Bool // 控制一次只允许一个 GeoIP 请求
+	reloadStatus          atomic.Bool // 配置热加载状态，避免重复触发
+	lastReportedStateMu   sync.Mutex  // 序列化最近一次状态上报缓存更新
 	lastReportedState     *model.HostState
 	lastReportedStateTime time.Time
 
-	dnsResolver = &net.Resolver{PreferGo: true}
+	dnsResolver = &net.Resolver{PreferGo: true} // 自定义 DNS 解析器，支持配置指定服务器
 	httpClient  = &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -93,6 +93,7 @@ const (
 )
 
 func setEnv() {
+	// gRPC 默认 resolver 不支持自定义 DNS，这里切换为 Go 解析器并注入配置的 DNS 列表
 	resolver.SetDefaultScheme("passthrough")
 	net.DefaultResolver.PreferGo = true // 使用 Go 内置的 DNS 解析器解析域名
 	net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -122,6 +123,7 @@ func setEnv() {
 }
 
 func loadDefaultConfigPath() string {
+	// Agent 默认读取与可执行文件同目录的 config.yml
 	var err error
 	executablePath, err = os.Executable()
 	if err != nil {
@@ -131,7 +133,7 @@ func loadDefaultConfigPath() string {
 }
 
 func preRun(configPath string) error {
-	// init
+	// 初始化运行环境并读取配置
 	setEnv()
 
 	if configPath == "" {
@@ -168,6 +170,7 @@ func preRun(configPath string) error {
 }
 
 func main() {
+	// CLI 支持直接运行、编辑配置和安装服务等子命令
 	app := &cli.App{
 		Usage:   "哪吒监控 Agent",
 		Version: version,
@@ -259,7 +262,7 @@ func run() {
 	var conn *grpc.ClientConn
 
 	retry := func() {
-		initialized = false
+		initialized = false // 标记为未初始化，下一轮重新握手
 		if conn != nil {
 			conn.Close()
 		}
@@ -313,7 +316,7 @@ func run() {
 			retry()
 			continue
 		}
-		go receiveTasksDaemon(tasks, wCancel)
+		go receiveTasksDaemon(tasks, wCancel) // 异步监听来自面板的任务
 
 		reportState, err := doWithTimeout(func() (pb.NezhaService_ReportSystemStateClient, error) {
 			return client.ReportSystemState(wCtx)
@@ -324,7 +327,7 @@ func run() {
 			retry()
 			continue
 		}
-		go reportStateDaemon(reportState, wCancel)
+		go reportStateDaemon(reportState, wCancel) // 持续向面板上报主机状态
 
 		select {
 		case <-reloadSigChan:
@@ -339,6 +342,7 @@ func run() {
 }
 
 func runService(action string, path string) {
+	// Windows 下将 Agent 注册为系统服务，或执行 install/start 等动作
 	winConfig := map[string]interface{}{
 		"OnFailure": "restart",
 	}
@@ -402,6 +406,7 @@ func runService(action string, path string) {
 }
 
 func receiveTasksDaemon(tasks pb.NezhaService_RequestTaskClient, cancel context.CancelFunc) {
+	// 面板通过双向流推送任务；若读取或发送失败通知上层退出
 	var task *pb.Task
 	var err error
 	for {
@@ -431,6 +436,7 @@ func receiveTasksDaemon(tasks pb.NezhaService_RequestTaskClient, cancel context.
 }
 
 func doTask(task *pb.Task) *pb.TaskResult {
+	// 根据任务类型分派不同执行函数；部分任务（终端/NAT/FM）使用单独的长连接流返回结果
 	var result pb.TaskResult
 	result.Id = task.GetId()
 	result.Type = task.GetType()
@@ -468,6 +474,7 @@ func doTask(task *pb.Task) *pb.TaskResult {
 
 // reportStateDaemon 向server上报状态信息
 func reportStateDaemon(stateClient pb.NezhaService_ReportSystemStateClient, cancel context.CancelFunc) {
+	// 周期性调用 reportState 来推送状态，失败时取消上下文触发重连
 	var err error
 	checkInterval := time.Second
 	for {
@@ -482,6 +489,7 @@ func reportStateDaemon(stateClient pb.NezhaService_ReportSystemStateClient, canc
 }
 
 func reportState(statClient pb.NezhaService_ReportSystemStateClient, host, ip time.Time) (time.Time, time.Time, error) {
+	// 负责状态上报与定期发送硬件/GeoIP 信息，返回最新的时间戳游标
 	if statClient.Context().Err() != nil {
 		return host, ip, statClient.Context().Err()
 	}
@@ -517,6 +525,7 @@ func reportState(statClient pb.NezhaService_ReportSystemStateClient, host, ip ti
 }
 
 func reportHost() bool {
+	// 利用原子变量保证只会同时存在一个上报任务，避免重复读取硬件信息
 	if !hostStatus.CompareAndSwap(false, true) {
 		return false
 	}

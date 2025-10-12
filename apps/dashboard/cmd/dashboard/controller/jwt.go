@@ -17,6 +17,7 @@ import (
 )
 
 func initParams() *jwt.GinJWTMiddleware {
+	// 配置 Gin-JWT 中间件的核心参数（签名秘钥、Cookie、处理回调等）
 	return &jwt.GinJWTMiddleware{
 		Realm:       singleton.Conf.SiteName,
 		Key:         []byte(singleton.Conf.JWTSecretKey),
@@ -49,6 +50,7 @@ func initParams() *jwt.GinJWTMiddleware {
 }
 
 func payloadFunc() func(data any) jwt.MapClaims {
+	// 登录成功后将用户 ID 放入 token payload
 	return func(data any) jwt.MapClaims {
 		if v, ok := data.(string); ok {
 			return jwt.MapClaims{
@@ -60,6 +62,7 @@ func payloadFunc() func(data any) jwt.MapClaims {
 }
 
 func identityHandler() func(c *gin.Context) any {
+	// 根据 token 中的用户 ID 加载数据库记录，挂载到上下文
 	return func(c *gin.Context) any {
 		claims := jwt.ExtractClaims(c)
 		userId := claims[model.CtxKeyAuthorizedUser].(string)
@@ -81,6 +84,7 @@ func identityHandler() func(c *gin.Context) any {
 // @Success 200 {object} model.CommonResponse[model.LoginResponse]
 // @Router /login [post]
 func authenticator() func(c *gin.Context) (any, error) {
+	// 登录认证：校验用户名和密码，并结合 WAF 对失败进行计次封禁
 	return func(c *gin.Context) (any, error) {
 		var loginVals model.LoginRequest
 		if err := c.ShouldBind(&loginVals); err != nil {
@@ -114,6 +118,7 @@ func authenticator() func(c *gin.Context) (any, error) {
 }
 
 func authorizator() func(data any, c *gin.Context) bool {
+	// 简单地判断身份是否加载成功
 	return func(data any, c *gin.Context) bool {
 		_, ok := data.(*model.User)
 		return ok
@@ -121,6 +126,7 @@ func authorizator() func(data any, c *gin.Context) bool {
 }
 
 func unauthorized() func(c *gin.Context, code int, message string) {
+	// 统一未授权响应格式
 	return func(c *gin.Context, code int, message string) {
 		c.JSON(http.StatusOK, model.CommonResponse[any]{
 			Success: false,
@@ -139,6 +145,7 @@ func unauthorized() func(c *gin.Context, code int, message string) {
 // @Success 200 {object} model.CommonResponse[model.LoginResponse]
 // @Router /refresh-token [get]
 func refreshResponse(c *gin.Context, code int, token string, expire time.Time) {
+	// 刷新 token 时复用登录响应结构
 	c.JSON(http.StatusOK, model.CommonResponse[model.LoginResponse]{
 		Success: true,
 		Data: model.LoginResponse{
@@ -149,6 +156,7 @@ func refreshResponse(c *gin.Context, code int, token string, expire time.Time) {
 }
 
 func fallbackAuthMiddleware(mw *jwt.GinJWTMiddleware) func(c *gin.Context) {
+	// 支持在未强制登录情况下复用已有 token 信息，同时为失效 token 做 WAF 限制
 	return func(c *gin.Context) {
 		claims, err := mw.GetClaimsFromJWT(c)
 		if err != nil {

@@ -100,7 +100,7 @@ func NewServiceSentinel(serviceSentinelDispatchBus chan<- *model.Service) (*Serv
 		dispatchBus:   serviceSentinelDispatchBus,
 	}
 
-	// 加载历史记录
+	// 加载历史记录，恢复服务定义与状态缓存
 	err := ss.loadServiceHistory()
 	if err != nil {
 		return nil, err
@@ -139,6 +139,7 @@ func NewServiceSentinel(serviceSentinelDispatchBus chan<- *model.Service) (*Serv
 }
 
 func (ss *ServiceSentinel) refreshMonthlyServiceStatus() {
+	// 每日凌晨滚动 30 天窗口，并清空当日统计缓存
 	// 刷新数据防止无人访问
 	ss.LoadStats()
 	// 将数据往前刷一天
@@ -168,10 +169,12 @@ func (ss *ServiceSentinel) refreshMonthlyServiceStatus() {
 
 // Dispatch 将传入的 ReportData 传给 服务状态汇报管道
 func (ss *ServiceSentinel) Dispatch(r ReportData) {
+	// 面板 RPC 服务调用此方法，将 Agent 上报的监控结果入队
 	ss.serviceReportChannel <- r
 }
 
 func (ss *ServiceSentinel) UpdateServiceList() {
+	// 重新生成排序后的服务列表，供前端展示或调度使用
 	ss.servicesLock.RLock()
 	defer ss.servicesLock.RUnlock()
 
@@ -186,6 +189,7 @@ func (ss *ServiceSentinel) UpdateServiceList() {
 
 // loadServiceHistory 加载服务监控器的历史状态信息
 func (ss *ServiceSentinel) loadServiceHistory() error {
+	// 启动时加载数据库中的服务定义，并注册对应的定时任务
 	var services []*model.Service
 	err := DB.Find(&services).Error
 	if err != nil {
