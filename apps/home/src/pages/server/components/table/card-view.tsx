@@ -119,6 +119,7 @@ export function CardView({ servers }: { servers: vps[] }) {
             { label: "CPU", percentage: cpuUsage },
             { label: "内存", percentage: memUsage, detail: memDetail },
             { label: "磁盘", percentage: diskUsage, detail: diskDetail },
+            { label: "月流量", percentage: diskUsage, detail: netInTransfer },
             // { label: "磁盘", percentage: diskUsage, detail: diskDetail },
           ]
           if (swapTotal > 0) {

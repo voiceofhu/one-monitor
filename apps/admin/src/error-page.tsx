@@ -1,42 +1,316 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { AlertCircle } from "lucide-react"
-import { useNavigate, useRouteError } from "react-router-dom"
+"use client"
 
-interface RouterError {
-    statusText?: string
-    message?: string
-    status?: number
-}
+import { Button } from "@/components/ui/button"
+import gsap from "gsap"
+import { useLayoutEffect, useMemo, useRef } from "react"
+import {
+    Link,
+    isRouteErrorResponse,
+    useNavigate,
+    useRouteError,
+} from "react-router-dom"
 
 export default function ErrorPage() {
-    const error = useRouteError() as RouterError
+    const containerRef = useRef<HTMLDivElement>(null)
+    const titleRef = useRef<HTMLHeadingElement>(null)
+    const messageRef = useRef<HTMLParagraphElement>(null)
+    const illustrationWrapperRef = useRef<HTMLDivElement>(null)
+    const illustrationRef = useRef<SVGSVGElement>(null)
+    const actionsRef = useRef<HTMLDivElement>(null)
+
+    const routeError = useRouteError()
     const navigate = useNavigate()
-    console.error(error)
+
+    const { statusCode, message } = useMemo(() => {
+        const fallback = "请求发生未知错误，请稍后再试。"
+
+        if (isRouteErrorResponse(routeError)) {
+            return {
+                statusCode: routeError.status.toString(),
+                message: routeError.statusText || fallback,
+            }
+        }
+
+        if (routeError instanceof Error) {
+            return {
+                statusCode: routeError.name || "Error",
+                message: routeError.message || fallback,
+            }
+        }
+
+        if (typeof routeError === "string") {
+            return {
+                statusCode: "Error",
+                message: routeError,
+            }
+        }
+
+        return {
+            statusCode: "Error",
+            message: fallback,
+        }
+    }, [routeError])
+
+    const handleRetry = () => {
+        navigate(0)
+    }
+
+    useLayoutEffect(() => {
+        const ctx = gsap.context(() => {
+            const tl = gsap.timeline({ defaults: { ease: "power3.out", duration: 0.6 } })
+            tl.from(titleRef.current, { y: -40, opacity: 0 })
+                .from(messageRef.current, { y: 30, opacity: 0 }, "-=0.3")
+                .from(
+                    illustrationWrapperRef.current,
+                    { scale: 0.85, opacity: 0, duration: 0.5 },
+                    "-=0.2",
+                )
+                .from(
+                    actionsRef.current ? Array.from(actionsRef.current.children) : [],
+                    { y: 20, opacity: 0, stagger: 0.15, duration: 0.45 },
+                    "-=0.15",
+                )
+        }, containerRef)
+
+        return () => ctx.revert()
+    }, [message])
+
+    useLayoutEffect(() => {
+        const ctx = gsap.context(() => {
+            if (!illustrationRef.current) {
+                return
+            }
+            gsap.to(illustrationRef.current, {
+                y: -12,
+                rotation: -1,
+                duration: 5,
+                ease: "sine.inOut",
+                yoyo: true,
+                repeat: -1,
+            })
+        }, illustrationWrapperRef)
+
+        return () => ctx.revert()
+    }, [])
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
-            <Card className="w-full max-w-md shadow-2xl rounded-2xl">
-                <CardContent className="pt-6 text-center space-y-4">
-                    <div className="flex justify-center">
-                        <AlertCircle className="h-12 w-12 text-destructive" />
-                    </div>
-                    <h1 className="text-4xl font-bold tracking-tight">Oops!</h1>
-                    <p className="text-lg text-muted-foreground/80">
-                        Sorry, an unexpected error has occurred.
-                    </p>
-                    <div className="p-4 bg-muted/70 rounded-lg">
-                        <p className="text-sm text-destructive font-semibold italic">
-                            {error.statusText || error.message}
-                        </p>
-                    </div>
-                </CardContent>
-                <CardFooter className="flex justify-center pb-6">
-                    <Button variant="default" size="lg" onClick={() => navigate("/dashboard")}>
-                        Back to Dashboard
-                    </Button>
-                </CardFooter>
-            </Card>
+        <div
+            ref={containerRef}
+            className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 text-center"
+        >
+            <title>Error</title>
+            <h1 ref={titleRef} className="text-3xl font-bold text-gray-800">
+                出错了
+            </h1>
+            <p className="mt-2 text-sm text-gray-500">{statusCode}</p>
+            <p ref={messageRef} className="mt-3 max-w-xl text-gray-600">
+                {message}
+            </p>
+
+            <div ref={illustrationWrapperRef} className="my-10 w-full max-w-md">
+                <UnDrawError svgRef={illustrationRef} />
+            </div>
+
+            <div ref={actionsRef} className="flex flex-col gap-3 sm:flex-row">
+                <Button onClick={handleRetry} variant="outline">
+                    重试
+                </Button>
+                <Link to="/" className="flex justify-center">
+                    <Button>返回首页</Button>
+                </Link>
+            </div>
         </div>
+    )
+}
+
+function UnDrawError({ svgRef }: { svgRef: React.RefObject<SVGSVGElement> }) {
+    return (
+        <svg
+            ref={svgRef}
+            className="h-auto w-full"
+            xmlns="http://www.w3.org/2000/svg"
+            data-name="Layer 1"
+            width="690"
+            height="448.7592"
+            viewBox="0 0 690 448.7592"
+        >
+            <path
+                d="M466.81292,645.7313c4.66847-10.08358,9.33339-20.31666,11.35946-31.24223s1.17569-22.78293-4.627-32.25932-17.22813-15.90241-28.13153-13.76022c-8.95532,1.75945-16.14605,8.81268-20.35651,16.90992S419.15759,602.60959,417.52,611.588c-.52917-10.2001-1.0896-20.56436-4.478-30.19975s-10.06045-18.61463-19.5694-22.34313-21.87886-.79648-26.89061,8.1032c-7.06074,12.53818,2.30155,30.12541-5.81734,42.0058-1.39265-11.917-13.85471-21.33234-25.69879-19.4159s-20.70109,14.78128-18.2646,26.5294c1.44978,6.99047,6.21931,12.93631,11.92156,17.232s12.33421,9.27436,18.89475,12.09Z"
+                transform="translate(-255 -225.6204)"
+                fill="#f2f2f2"
+            />
+            <path
+                d="M323.01987,598.15781c9.40825,3.28851,18.903,6.61425,27.49226,11.75558,7.698,4.60786,14.553,10.81187,18.88231,18.7569a33.35556,33.35556,0,0,1,4.12583,13.85861c.06251,1.01759,1.65458,1.02469,1.59164,0-.55661-9.061-4.97238-17.353-11.087-23.91075-6.704-7.18984-15.39158-12.10041-24.3611-15.91043-5.31821-2.259-10.76859-4.17895-16.2208-6.08468-.96887-.33866-1.3854,1.19842-.42311,1.53477Z"
+                transform="translate(-255 -225.6204)"
+                fill="#fff"
+            />
+            <path
+                d="M377.28745,560.62486a143.38254,143.38254,0,0,1,13.79113,30.61557,145.11672,145.11672,0,0,1,6.361,32.96846,143.30543,143.30543,0,0,1,.15151,18.83685c-.05905,1.02328,1.53278,1.01989,1.59163,0a145.1941,145.1941,0,0,0-2.04032-33.82049,146.92647,146.92647,0,0,0-9.769-32.44022,143.25,143.25,0,0,0-8.71162-16.9635.79641.79641,0,0,0-1.37432.80333Z"
+                transform="translate(-255 -225.6204)"
+                fill="#fff"
+            />
+            <path
+                d="M455.188,569.76743a232.04359,232.04359,0,0,0-17.11648,57.57847q-1.34225,8.36487-2.07791,16.81182c-.089,1.02023,1.50317,1.01426,1.59163,0a231.20919,231.20919,0,0,1,12.73788-58.02528q2.83382-7.89209,6.23921-15.56169c.412-.92791-.959-1.73862-1.37433-.80332Z"
+                transform="translate(-255 -225.6204)"
+                fill="#fff"
+            />
+            <rect
+                x="709.17625"
+                y="639.47815"
+                width="9.88235"
+                height="46.58824"
+                transform="translate(1112.59535 -285.4804) rotate(89.25872)"
+                fill="#e6e6e6"
+            />
+            <path
+                d="M754.02652,669.61624l-6.65257-.0194-4.11239-7.33712-3.55331,7.20262-34.84684-.10141-4.46989-8.20046-4.34266,8.6233-5.34826-.01557.08616-29.44058.0222-7.60616.03573-12.18855.00945-3.39875,67.0826.19537.00817,3.0871.02087,7.90858.02042,7.80712Zm-34.53593-27.79906,1.40965,1.40031,6.23469,6.19911,2.951-3.142,1.61417-1.71881,12.29387-13.07657-8.0649-.02349-5.05019-.01471Z"
+                transform="translate(-255 -225.6204)"
+                fill="#2f2e41"
+            />
+            <path
+                d="M728.08622,574.08958s-37-13-46,15,3,45,3,45l46,37,30-22-13-34Z"
+                transform="translate(-255 -225.6204)"
+                fill="#e6e6e6"
+            />
+            <path
+                d="M707.08622,522.08958c-1,9-13,18-25,29s-23,26-14,35,20,21,20,21l74-50-13-41Z"
+                transform="translate(-255 -225.6204)"
+                fill="#fff"
+            />
+            <path
+                d="M802.08622,548.08958s-6,5-7,20,9,23,9,23l55,6,13-21-19-28Z"
+                transform="translate(-255 -225.6204)"
+                fill="#ffb8b8"
+            />
+            <path
+                d="M760.08622,486.08958s-25-14-35,2,0,24-4,30-16,15-6,24,28,6,31,4,10,0,10,0l4-24Z"
+                transform="translate(-255 -225.6204)"
+                fill="#ffb8b8"
+            />
+            <polygon
+                points="570.144 303.368 536.437 302.18 537.774 328.136 565.516 328.136 570.144 303.368"
+                fill="#ffb8b8"
+            />
+            <path
+                d="M789.18809,618.49673h38.53073a0,0,0,0,1,0,0v14.88687a0,0,0,0,1,0,0H804.07494a14.88685,14.88685,0,0,1-14.88685-14.88685v0A0,0,0,0,1,789.18809,618.49673Z"
+                transform="translate(108.71051 1320.97269) rotate(-101.96466)"
+                fill="#2f2e41"
+            />
+            <polygon
+                points="524.12 382.586 518.777 393.621 473.673 378.264 481.559 361.979 524.12 382.586"
+                fill="#ffb8b8"
+            />
+            <path
+                d="M771.03745,617.45562h23.64388a0,0,0,0,1,0,0v14.88687a0,0,0,0,1,0,0H756.15059a0,0,0,0,1,0,0v0A14.88685,14.88685,0,0,1,771.03745,617.45562Z"
+                transform="translate(-379.9408 824.86818) rotate(-64.16458)"
+                fill="#2f2e41"
+            />
+            <path
+                d="M690.25925,586.41362a10.74272,10.74272,0,0,0,12.70881-10.48016l74.37388-68.5711-18.47-14.30549-67.33743,71.94341a10.80091,10.80091,0,0,0-1.27527,21.41334Z"
+                transform="translate(-255 -225.6204)"
+                fill="#ffb8b8"
+            />
+            <circle cx="536.34449" cy="207.89831" r="24.56103" fill="#ffb8b8" />
+            <path
+                d="M813.38612,577.89329c-17.22851.00049-37.978-3.62842-50.77856-18.477l-.28833-.33447.29663-.32813c.09668-.10693,9.51367-10.86865.11084-30.061L749.799,532.67015,736.9286,515.68138l7.12964-21.38916,29.17749-23.50391a26.75074,26.75074,0,0,1,14.6106-5.78906,80.21058,80.21058,0,0,0,27.78467-7.91309,27.906,27.906,0,0,1,12.7998-2.79834l.57373.01611a9.95022,9.95022,0,0,1,9.64063,10.70752c-1.97852,25.62989-5.47242,87.54346,4.7915,108.86133l.26514.55078-.59229.15039A136.1132,136.1132,0,0,1,813.38612,577.89329Z"
+                transform="translate(-255 -225.6204)"
+                fill="#000000"
+            />
+            <path
+                d="M765.98622,559.08958s-65-6-72,13,1,28,13,32,41,9,41,9l13-16,34,2s37.88482,21.9732,48.35975,45.47377A30.76193,30.76193,0,0,0,869.12343,662.802c8.398.58447,15.86279-2.5874,15.86279-15.7124,0-30-42-73-42-73Z"
+                transform="translate(-255 -225.6204)"
+                fill="#2f2e41"
+            />
+            <path
+                d="M716.48622,588.58958s17-5,44,8"
+                transform="translate(-255 -225.6204)"
+                fill="#2f2e41"
+            />
+            <path
+                d="M766.84286,417.85547a73.04115,73.04115,0,0,0,31.59919,10.4119l-3.33084-3.991a24.4775,24.4775,0,0,0,7.5611,1.50142,8.28066,8.28066,0,0,0,6.74954-3.15917,7.70229,7.70229,0,0,0,.51556-7.115,14.58851,14.58851,0,0,0-4.58936-5.7385,27.32286,27.32286,0,0,0-25.43066-4.54493,16.32974,16.32974,0,0,0-7.59542,4.8722,9.23578,9.23578,0,0,0-1.86256,8.56086"
+                transform="translate(-255 -225.6204)"
+                fill="#2f2e41"
+            />
+            <path
+                d="M795.30911,398.22407A75.48468,75.48468,0,0,1,814.446,371.70269c5.292-4.70276,11.47246-8.74308,18.44626-9.9627s14.83309.86982,19.11055,6.51116c3.49772,4.613,4.15213,10.79276,3.76672,16.569s-1.67632,11.49651-1.5527,17.28428a35.46794,35.46794,0,0,0,50.52712,31.351c-6.02152,3.32885-10.714,8.59777-16.3048,12.60812s-12.96272,6.7601-19.31233,4.11012c-6.71812-2.80378-9.79963-10.41937-12.20607-17.28984L846.189,402.2443c-1.82434-5.20852-3.739-10.57156-7.462-14.6454s-9.76461-6.5568-14.88927-4.50871c-3.884,1.55225-6.41275,5.25755-8.63029,8.804s-4.557,7.31984-8.30359,9.17935-9.29837.7147-10.52292-3.28471"
+                transform="translate(-255 -225.6204)"
+                fill="#2f2e41"
+            />
+            <rect
+                x="802.91902"
+                y="543.31418"
+                width="9.88235"
+                height="46.58824"
+                transform="translate(-416.74744 524.13837) rotate(-45.74128)"
+                fill="#e6e6e6"
+            />
+            <path
+                d="M821.51005,579.90944a9.88235,9.88235,0,1,0,13.97459-.18081A9.88238,9.88238,0,0,0,821.51005,579.90944Zm10.111,9.8527a4.23529,4.23529,0,1,1-.07749-5.98911A4.2354,4.2354,0,0,1,831.62105,589.76214Z"
+                transform="translate(-255 -225.6204)"
+                fill="#e6e6e6"
+            />
+            <path
+                d="M784.47962,533.54889l4.69037,4.7178-2.28023,8.096-8.3137,2.02755-4.358-4.38337a11.99891,11.99891,0,1,0,10.26158-10.458Z"
+                transform="translate(-255 -225.6204)"
+                fill="#e6e6e6"
+            />
+            <path
+                d="M803.736,577.97923a11.579,11.579,0,0,1-1.26831-.07032,11.02341,11.02341,0,0,1-9.68018-9.68115,11.00337,11.00337,0,0,1,10.93115-12.25,10.62483,10.62483,0,0,1,1.46607.10938L838.76332,520.342l-3.50513-11.68457,17.605-7.8916,4.93384,12.06006a20.48972,20.48972,0,0,1-6.17724,23.67236l-36.96119,29.40088a10.25885,10.25885,0,0,1-.06006,1.07861,11.01824,11.01824,0,0,1-3.66382,8.19678A10.87186,10.87186,0,0,1,803.736,577.97923Z"
+                transform="translate(-255 -225.6204)"
+                fill="#ffb8b8"
+            />
+            <path
+                d="M829.98622,459.08958h0a9.45335,9.45335,0,0,1,12.628,5.1563l17.372,43.84371-27,18Z"
+                transform="translate(-255 -225.6204)"
+                fill="#ffb8b8"
+            />
+            <path
+                d="M835.64273,451.324C827.44347,465.80747,808.03517,506.297,808.4394,542.5015a49.338,49.338,0,0,0,3.62211,18.2l-35.97529-31.61228-.40438-.35615.2863-.44133c5.75852-8.87261,8.03244-20.62213,11.37808-38.60151,1.501-8.13645,3.173-17.21877,5.55911-27.36439,6.89674-29.39537,25.70013-46.31061,31.55988-50.85849a7.35229,7.35229,0,0,1,11.80482,8.82821Z"
+                transform="translate(-255 -225.6204)"
+                fill="#2f2e41"
+            />
+            <polygon
+                points="553.626 148.32 571.457 125.957 556.674 113.705 550.867 141.883 553.626 148.32"
+                fill="#ffb8b8"
+            />
+            <path
+                d="M794.97871,422.6254l-30.54369,55.6272-20.64366-43.71926A26.84593,26.84593,0,0,1,756.55,403.51593l27.96593-10.94651Z"
+                transform="translate(-255 -225.6204)"
+                fill="#2f2e41"
+            />
+            <rect
+                x="274.08622"
+                y="591.08958"
+                width="170"
+                height="2"
+                transform="translate(-364.08622 1161.17916) rotate(-180)"
+                fill="#3f3d56"
+            />
+            <path
+                d="M599.08622,501.08958a9,9,0,1,0,9-9A9.01014,9.01014,0,0,0,599.08622,501.08958Zm9,5a5,5,0,1,1,5-5A5.00573,5.00573,0,0,1,608.08622,506.08958Z"
+                transform="translate(-255 -225.6204)"
+                fill="#3f3d56"
+            />
+            <path
+                d="M701.08622,420.08958h-64a6.99984,6.99984,0,0,1-7-7v-64a6.99984,6.99984,0,0,1,7-7h64a6.99984,6.99984,0,0,1,7,7v64A6.99984,6.99984,0,0,1,701.08622,420.08958Zm-64-76a4,4,0,0,0-4,4v64a4,4,0,0,0,4,4h64a4,4,0,0,0,4-4v-64a4,4,0,0,0-4-4Z"
+                transform="translate(-255 -225.6204)"
+                fill="#3f3d56"
+            />
+            <path
+                d="M784.08622,341.08958h-64a6.99984,6.99984,0,0,1-7-7v-64a6.99984,6.99984,0,0,1,7-7h64a6.99984,6.99984,0,0,1,7,7v64A6.99984,6.99984,0,0,1,784.08622,341.08958Zm-64-76a4,4,0,0,0-4,4v64a4,4,0,0,0,4,4h64a4,4,0,0,0,4-4v-64a4,4,0,0,0-4-4Z"
+                transform="translate(-255 -225.6204)"
+                fill="#3f3d56"
+            />
+            <path
+                d="M691.08622,359.08958h-64a6.99984,6.99984,0,0,1-7-7v-64a6.99984,6.99984,0,0,1,7-7h64a6.99984,6.99984,0,0,1,7,7v64A6.99984,6.99984,0,0,1,691.08622,359.08958Zm-64-76a4,4,0,0,0-4,4v64a4,4,0,0,0,4,4h64a4,4,0,0,0,4-4v-64a4,4,0,0,0-4-4Z"
+                transform="translate(-255 -225.6204)"
+                fill="#3f3d56"
+            />
+            <path
+                d="M774.08622,280.08958h-64a6.99984,6.99984,0,0,1-7-7v-64a6.99984,6.99984,0,0,1,7-7h64a6.99984,6.99984,0,0,1,7,7v64A6.99984,6.99984,0,0,1,774.08622,280.08958Zm-64-76a4,4,0,0,0-4,4v64a4,4,0,0,0,4,4h64a4,4,0,0,0,4-4v-64a4,4,0,0,0-4-4Z"
+                transform="translate(-255 -225.6204)"
+                fill="#3f3d56"
+            />
+        </svg>
     )
 }

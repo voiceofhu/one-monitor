@@ -20,6 +20,10 @@ type Server struct {
 	PublicNote             string     `json:"public_note,omitempty"`    // 公开备注
 	Account                string     `json:"account,omitempty"`        // 账号信息
 	ExpiredAt              *time.Time `json:"expired_at,omitempty"`     // 到期时间
+	PurchasePrice          *float64   `json:"purchase_price,omitempty"` // 购买价格
+	PurchaseDate           *time.Time `json:"purchase_date,omitempty"`  // 购买日期
+	PurchaseYears          *uint32    `json:"purchase_years,omitempty"` // 购买年限，单位：年
+	MonthlyTraffic         *uint64    `json:"monthly_traffic,omitempty"`
 	DisplayIndex           int        `json:"display_index"`            // 展示排序，越大越靠前
 	HideForGuest           bool       `json:"hide_for_guest,omitempty"` // 对游客隐藏
 	EnableDDNS             bool       `json:"enable_ddns,omitempty"`    // 启用DDNS

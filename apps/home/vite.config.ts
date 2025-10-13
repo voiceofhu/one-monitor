@@ -1,9 +1,7 @@
+import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react-swc"
 import path from "path"
 import { defineConfig } from "vite"
-import tailwindcss from '@tailwindcss/vite'
-
-
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -21,12 +19,12 @@ export default defineConfig({
     // },
     proxy: {
       "/api/v1/ws/server": {
-        target: "ws://localhost:8008",
+        target: "ws://localhost:27399",
         changeOrigin: true,
         ws: true,
       },
       "/api/v1/": {
-        target: "http://localhost:8008",
+        target: "http://localhost:27399",
         changeOrigin: true,
       },
     },

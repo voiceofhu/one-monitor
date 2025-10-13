@@ -32,10 +32,10 @@ type ConfigDashboard struct {
 	InstallHost string `koanf:"install_host" json:"install_host,omitempty"`
 	AgentTLS    bool   `koanf:"tls" json:"tls,omitempty"` // 用于前端判断生成的安装命令是否启用 TLS
 
-	WebRealIPHeader  string `koanf:"web_real_ip_header" json:"web_real_ip_header,omitempty"` // 前端真实IP
-	AgentRealIPHeader  string `koanf:"agent_real_ip_header" json:"agent_real_ip_header,omitempty"` // Agent真实IP
-	UserTemplate  string `koanf:"user_template" json:"user_template,omitempty"`
-	AdminTemplate string `koanf:"admin_template" json:"admin_template,omitempty"`
+	WebRealIPHeader   string `koanf:"web_real_ip_header" json:"web_real_ip_header,omitempty"`     // 前端真实IP
+	AgentRealIPHeader string `koanf:"agent_real_ip_header" json:"agent_real_ip_header,omitempty"` // Agent真实IP
+	UserTemplate      string `koanf:"user_template" json:"user_template,omitempty"`
+	AdminTemplate     string `koanf:"admin_template" json:"admin_template,omitempty"`
 
 	EnablePlainIPInNotification bool `koanf:"enable_plain_ip_in_notification" json:"enable_plain_ip_in_notification,omitempty"` // 通知信息IP不打码
 
@@ -106,7 +106,7 @@ func (c *Config) Read(path string, frontendTemplates []FrontendTemplate) error {
 	}
 
 	if c.ListenPort == 0 {
-		c.ListenPort = 8008
+		c.ListenPort = 27399
 	}
 	if c.Language == "" {
 		c.Language = "en_US"

@@ -39,3 +39,4 @@ yarn-error.log*
 */main
 apps/agent/tmp/main
 apps/dashboard/tmp/main
+.gocache

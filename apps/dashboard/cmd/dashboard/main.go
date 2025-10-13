@@ -86,7 +86,7 @@ func initSystem(bus chan<- *model.Service) error {
 // @license.name  Apache 2.0
 // @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host      localhost:8008
+// @host      localhost:27399
 // @BasePath  /api/v1
 
 // @securityDefinitions.apikey  BearerAuth

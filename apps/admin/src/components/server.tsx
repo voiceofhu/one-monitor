@@ -45,6 +45,10 @@ const serverFormSchema = z.object({
     name: z.string().min(1),
     account: asOptionalField(z.string()),
     expired_at: asOptionalField(z.string()),
+    purchase_price: asOptionalField(z.coerce.number().min(0)),
+    purchase_date: asOptionalField(z.string()),
+    purchase_years: asOptionalField(z.coerce.number().int().min(0)),
+    monthly_traffic: asOptionalField(z.coerce.number().min(0)),
     note: asOptionalField(z.string()),
     public_note: asOptionalField(z.string()),
     display_index: z.coerce.number().int(),
@@ -163,6 +167,10 @@ export const ServerCard: FC<ServerCardProps> = ({ data, mutate }) => {
             ...data,
             account: data.account ?? "",
             expired_at: formatDateInputValue(data.expired_at),
+            purchase_price: data.purchase_price ?? undefined,
+            purchase_date: formatDateInputValue(data.purchase_date ?? undefined),
+            purchase_years: data.purchase_years ?? undefined,
+            monthly_traffic: data.monthly_traffic ?? undefined,
             ddns_profiles_raw: data.ddns_profiles ? conv.arrToStr(data.ddns_profiles) : undefined,
             override_ddns_domains_raw: data.override_ddns_domains
                 ? JSON.stringify(data.override_ddns_domains)
@@ -185,6 +193,10 @@ export const ServerCard: FC<ServerCardProps> = ({ data, mutate }) => {
             ...data,
             account: data.account ?? "",
             expired_at: formatDateInputValue(data.expired_at),
+            purchase_price: data.purchase_price ?? undefined,
+            purchase_date: formatDateInputValue(data.purchase_date ?? undefined),
+            purchase_years: data.purchase_years ?? undefined,
+            monthly_traffic: data.monthly_traffic ?? undefined,
             ddns_profiles_raw: data.ddns_profiles ? conv.arrToStr(data.ddns_profiles) : undefined,
             override_ddns_domains_raw: data.override_ddns_domains
                 ? JSON.stringify(data.override_ddns_domains)
@@ -236,6 +248,12 @@ export const ServerCard: FC<ServerCardProps> = ({ data, mutate }) => {
         payload.expired_at = values.expired_at
             ? new Date(`${values.expired_at}T00:00:00Z`).toISOString()
             : undefined
+        payload.purchase_date = values.purchase_date
+            ? new Date(`${values.purchase_date}T00:00:00Z`).toISOString()
+            : null
+        payload.purchase_price = values.purchase_price ?? null
+        payload.purchase_years = values.purchase_years ?? null
+        payload.monthly_traffic = values.monthly_traffic ?? null
         try {
             await updateServer(data.id, payload)
             toast(t("Done"), { description: t("Results.Success") })
@@ -363,6 +381,113 @@ export const ServerCard: FC<ServerCardProps> = ({ data, mutate }) => {
                                                         </FormLabel>
                                                         <FormControl>
                                                             <Input type="date" {...field} />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <FormField
+                                                control={form.control}
+                                                name="purchase_price"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>
+                                                            {t("PurchasePrice", { defaultValue: "购入价格" })}
+                                                        </FormLabel>
+                                                        <FormControl>
+                                                            <Input
+                                                                type="number"
+                                                                min={0}
+                                                                step="0.01"
+                                                                value={field.value ?? ""}
+                                                                onChange={(event) => {
+                                                                    const next = Number(event.target.value)
+                                                                    field.onChange(
+                                                                        event.target.value === "" ||
+                                                                            Number.isNaN(next)
+                                                                            ? undefined
+                                                                            : next,
+                                                                    )
+                                                                }}
+                                                                placeholder="0.00"
+                                                            />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="purchase_date"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>
+                                                            {t("PurchaseDate", { defaultValue: "购买日期" })}
+                                                        </FormLabel>
+                                                        <FormControl>
+                                                            <Input type="date" {...field} />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="purchase_years"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>
+                                                            {t("PurchaseYears", { defaultValue: "购买年限" })}
+                                                        </FormLabel>
+                                                        <FormControl>
+                                                            <Input
+                                                                type="number"
+                                                                min={0}
+                                                                step="1"
+                                                                value={field.value ?? ""}
+                                                                onChange={(event) => {
+                                                                    const next = Number(event.target.value)
+                                                                    field.onChange(
+                                                                        event.target.value === "" ||
+                                                                            Number.isNaN(next)
+                                                                            ? undefined
+                                                                            : Math.trunc(next),
+                                                                    )
+                                                                }}
+                                                                placeholder="0"
+                                                            />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="monthly_traffic"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>
+                                                            {t("MonthlyTraffic", { defaultValue: "月度流量 (GB)" })}
+                                                        </FormLabel>
+                                                        <FormControl>
+                                                            <Input
+                                                                type="number"
+                                                                min={0}
+                                                                step="0.01"
+                                                                value={field.value ?? ""}
+                                                                onChange={(event) => {
+                                                                    const next = Number(event.target.value)
+                                                                    field.onChange(
+                                                                        event.target.value === "" ||
+                                                                            Number.isNaN(next)
+                                                                            ? undefined
+                                                                            : next,
+                                                                    )
+                                                                }}
+                                                                placeholder="0"
+                                                            />
                                                         </FormControl>
                                                         <FormMessage />
                                                     </FormItem>

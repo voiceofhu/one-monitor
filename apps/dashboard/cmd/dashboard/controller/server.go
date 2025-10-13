@@ -78,6 +78,10 @@ func updateServer(c *gin.Context) (any, error) {
 	s.PublicNote = sf.PublicNote
 	s.Account = sf.Account
 	s.ExpiredAt = sf.ExpiredAt
+	s.PurchasePrice = sf.PurchasePrice
+	s.PurchaseDate = sf.PurchaseDate
+	s.PurchaseYears = sf.PurchaseYears
+	s.MonthlyTraffic = sf.MonthlyTraffic
 	s.HideForGuest = sf.HideForGuest
 	s.EnableDDNS = sf.EnableDDNS
 	s.DDNSProfiles = sf.DDNSProfiles
@@ -123,18 +127,22 @@ func batchDeleteServer(c *gin.Context) (any, error) {
 		return nil, err
 	}
 
+	if len(servers) == 0 {
+		return nil, nil
+	}
+
 	if !singleton.ServerShared.CheckPermission(c, slices.Values(servers)) {
 		return nil, singleton.Localizer.ErrorT("permission denied")
 	}
 
+	var (
+		natIDs []uint64
+	)
+
 	err := singleton.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Unscoped().Delete(&model.Server{}, "id in (?)", servers).Error; err != nil {
-			return err
-		}
-		if err := tx.Unscoped().Delete(&model.ServerGroupServer{}, "server_id in (?)", servers).Error; err != nil {
-			return err
-		}
-		return nil
+		var err error
+		natIDs, err = singleton.DeleteServers(tx, servers)
+		return err
 	})
 
 	if err != nil {
@@ -151,8 +159,11 @@ func batchDeleteServer(c *gin.Context) (any, error) {
 			}
 		}
 	}
-	singleton.DB.Unscoped().Delete(&model.Transfer{}, "server_id in (?)", servers)
 	singleton.AlertsLock.Unlock()
+
+	if len(natIDs) > 0 {
+		singleton.NATShared.Delete(natIDs)
+	}
 
 	singleton.ServerShared.Delete(servers)
 	return nil, nil

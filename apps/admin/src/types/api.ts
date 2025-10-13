@@ -505,6 +505,10 @@ export interface ModelServer {
     id: number
     account?: string
     expired_at?: string
+    purchase_price?: number | null
+    purchase_date?: string | null
+    purchase_years?: number | null
+    monthly_traffic?: number | null
     last_active: string
     name: string
     /** 管理员可见备注 */
@@ -536,6 +540,10 @@ export interface ModelServerForm {
     hide_for_guest?: boolean
     account?: string
     expired_at?: string
+    purchase_price?: number | null
+    purchase_date?: string | null
+    purchase_years?: number | null
+    monthly_traffic?: number | null
     name: string
     /** 管理员可见备注 */
     note?: string

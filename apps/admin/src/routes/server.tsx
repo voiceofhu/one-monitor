@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table"
 import { IconButton } from "@/components/xui/icon-button"
 import { useServer } from "@/hooks/useServer"
-import { joinIP } from "@/lib/utils"
+import { cn, joinIP } from "@/lib/utils"
 import {
     ModelServer,
     ModelServerForm,
@@ -53,7 +53,14 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Loader2 } from "lucide-react"
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import {
+    type CSSProperties,
+    type ReactNode,
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import useSWR from "swr"
@@ -68,6 +75,19 @@ interface CategoryMeta {
     label: string
     count: number
     type: "static" | "group"
+}
+
+type ColumnMeta = {
+    headerClassName?: string
+    cellClassName?: string
+}
+
+type TableColumnConfig = {
+    id: string
+    header: string
+    headerClassName?: string
+    cellClassName?: string
+    render: (server: ModelServer) => ReactNode
 }
 
 const toServerDraggableId = (id: number) => `${SERVER_PREFIX}${id}`
@@ -187,8 +207,156 @@ export default function ServerPage() {
         [visibleServers],
     )
 
-    const columns = useMemo<ColumnDef<ModelServer>[]>(() => {
+    const currencyFormatter = useMemo(
+        () => new Intl.NumberFormat(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+        [],
+    )
+
+    const trafficFormatter = useMemo(
+        () => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }),
+        [],
+    )
+
+    const columnConfigs = useMemo<TableColumnConfig[]>(() => {
+        const empty = "—"
+        const formatDate = (value?: string | null) => {
+            if (!value) return empty
+            const date = new Date(value)
+            if (Number.isNaN(date.getTime())) {
+                return value
+            }
+            return date.toISOString().slice(0, 10)
+        }
+        const formatPrice = (value?: number | null) =>
+            value == null ? empty : currencyFormatter.format(value)
+        const formatYears = (value?: number | null) =>
+            value == null ? empty : `${value}${t("YearUnit", { defaultValue: "年" })}`
+        const formatTraffic = (value?: number | null) =>
+            value == null
+                ? empty
+                : `${trafficFormatter.format(value)}${t("GBUnit", { defaultValue: "GB" })}`
+
         return [
+            {
+                id: "name",
+                header: t("Name", { defaultValue: "名称" }),
+                headerClassName: "min-w-[160px] px-3",
+                cellClassName: "min-w-[160px] px-3 py-2",
+                render: (server) => (
+                    <span className="block truncate font-medium" title={server.name}>
+                        {server.name}
+                    </span>
+                ),
+            },
+            {
+                id: "account",
+                header: t("Account", { defaultValue: "账号" }),
+                headerClassName: "min-w-[120px] px-3",
+                cellClassName: "min-w-[120px] px-3 py-2 text-xs text-muted-foreground",
+                render: (server) => server.account || empty,
+            },
+            {
+                id: "ip",
+                header: "IP",
+                headerClassName: "min-w-[150px] px-3",
+                cellClassName: "min-w-[150px] px-3 py-2 text-xs text-muted-foreground",
+                render: (server) => {
+                    const ipText = joinIP(server.geoip?.ip)
+                    if (!ipText) return empty
+                    return (
+                        <span className="block truncate" title={ipText}>
+                            {ipText}
+                        </span>
+                    )
+                },
+            },
+            {
+                id: "purchase_price",
+                header: t("PurchasePrice", { defaultValue: "购入价格" }),
+                headerClassName: "min-w-[120px] px-3 text-right",
+                cellClassName: "min-w-[120px] px-3 py-2 text-right",
+                render: (server) => formatPrice(server.purchase_price),
+            },
+            {
+                id: "agent_version",
+                header: t("AgentVersion", { defaultValue: "Agent 版本" }),
+                headerClassName: "w-[120px] px-3 text-center",
+                cellClassName: "w-[120px] px-3 py-2 text-center text-xs text-muted-foreground",
+                render: (server) => server.host?.version || t("Unknown"),
+            },
+            {
+                id: "purchase_date",
+                header: t("PurchaseDate", { defaultValue: "购买日期" }),
+                headerClassName: "min-w-[120px] px-3",
+                cellClassName: "min-w-[120px] px-3 py-2",
+                render: (server) => formatDate(server.purchase_date),
+            },
+            {
+                id: "purchase_years",
+                header: t("PurchaseYears", { defaultValue: "购买年限" }),
+                headerClassName: "w-[110px] px-3 text-right",
+                cellClassName: "w-[110px] px-3 py-2 text-right",
+                render: (server) => formatYears(server.purchase_years),
+            },
+            {
+                id: "monthly_traffic",
+                header: t("MonthlyTraffic", { defaultValue: "月度流量 (GB)" }),
+                headerClassName: "min-w-[140px] px-3 text-right",
+                cellClassName: "min-w-[140px] px-3 py-2 text-right",
+                render: (server) => formatTraffic(server.monthly_traffic),
+            },
+            {
+                id: "expired_at",
+                header: t("ExpireAt", { defaultValue: "到期日期" }),
+                headerClassName: "min-w-[120px] px-3",
+                cellClassName: "min-w-[120px] px-3 py-2",
+                render: (server) => formatDate(server.expired_at),
+            },
+            {
+                id: "enable_ddns",
+                header: t("DDNSStatus", { defaultValue: "DDNS 状态" }),
+                headerClassName: "w-[110px] px-3 text-center",
+                cellClassName: "w-[110px] px-3 py-2 text-center",
+                render: (server) => (
+                    <span className="text-sm font-medium">
+                        {server.enable_ddns
+                            ? t("Enabled", { defaultValue: "启用" })
+                            : t("Disabled", { defaultValue: "禁用" })}
+                    </span>
+                ),
+            },
+            {
+                id: "hide_for_guest",
+                header: t("GuestVisible", { defaultValue: "游客可见" }),
+                headerClassName: "w-[110px] px-3 text-center",
+                cellClassName: "w-[110px] px-3 py-2 text-center",
+                render: (server) => (
+                    <span className="text-sm font-medium">
+                        {server.hide_for_guest
+                            ? t("Disabled", { defaultValue: "禁用" })
+                            : t("Enabled", { defaultValue: "启用" })}
+                    </span>
+                ),
+            },
+            {
+                id: "note",
+                header: t("Note", { defaultValue: "备注" }),
+                headerClassName: "w-[120px] px-3 text-center",
+                cellClassName: "w-[120px] px-3 py-2 text-center",
+                render: (server) => <NoteMenu note={{ private: server.note, public: server.public_note }} />,
+            },
+            {
+                id: "uuid",
+                header: "UUID",
+                headerClassName: "min-w-[200px] px-3",
+                cellClassName: "min-w-[200px] px-3 py-2",
+                render: (server) => <CopyButton text={server.uuid} />,
+            },
+        ]
+    }, [currencyFormatter, t, trafficFormatter])
+
+    const columns = useMemo<ColumnDef<ModelServer>[]>(() => {
+        const baseColumns: ColumnDef<ModelServer>[] = [
             {
                 id: "drag",
                 header: "",
@@ -196,6 +364,10 @@ export default function ServerPage() {
                 enableSorting: false,
                 enableHiding: false,
                 size: 36,
+                meta: {
+                    headerClassName: "w-9 px-2",
+                    cellClassName: "w-9 px-2 text-center align-middle",
+                },
             },
             {
                 id: "select",
@@ -219,135 +391,50 @@ export default function ServerPage() {
                 enableSorting: false,
                 enableHiding: false,
                 size: 48,
-            },
-        {
-            header: "名称",
-            accessorKey: "name",
-            cell: ({ row }) => (
-                <div className="max-w-36 whitespace-normal break-words font-medium">
-                    {row.original.name}
-                </div>
-                ),
-            },
-        {
-            header: "分组",
-            id: "groups",
-            cell: ({ row }) => {
-                const groups = getGroupNames(row.original.id, serverGroups)
-                return groups.length ? (
-                        <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
-                            {groups.map((groupName) => (
-                                <span
-                                    key={groupName}
-                                    className="rounded border border-border/60 px-1 py-0.5"
-                                >
-                                    {groupName}
-                                </span>
-                            ))}
-                        </div>
-                    ) : (
-                        <span className="text-xs text-muted-foreground/80">-</span>
-                    )
+                meta: {
+                    headerClassName: "w-12 px-2 text-center",
+                    cellClassName: "w-12 px-2 text-center align-middle",
                 },
             },
+            ...columnConfigs.map((config) => ({
+                id: config.id,
+                header: config.header,
+                cell: ({ row }: { row: Row<ModelServer> }) => config.render(row.original),
+                meta: {
+                    headerClassName: cn("px-3", config.headerClassName),
+                    cellClassName: cn("px-3 py-2", config.cellClassName),
+                },
+            })),
             {
-                id: "ip",
-                header: "IP",
+                id: "actions",
+                header: t("Actions", { defaultValue: "操作" }),
                 cell: ({ row }) => {
                     const s = row.original
                     return (
-                        <div className="max-w-36 whitespace-normal break-words text-xs text-muted-foreground">
-                            {joinIP(s.geoip?.ip)}
+                        <div className="flex justify-end">
+                            <ActionButtonGroup
+                                className="flex gap-2"
+                                delete={{ fn: deleteServer, id: s.id, mutate: mutate }}
+                            >
+                                <>
+                                    <TerminalButton id={s.id} />
+                                    <ServerCard mutate={mutate} data={s} />
+                                </>
+                            </ActionButtonGroup>
                         </div>
                     )
                 },
-            },
-        {
-            header: "Agent 版本",
-            accessorKey: "host.version",
-            accessorFn: (row) => row.host.version || t("Unknown"),
-        },
-        {
-            header: "账号",
-            accessorKey: "account",
-            cell: ({ row }) => (
-                <span className="text-sm text-muted-foreground">
-                    {row.original.account ? row.original.account : "—"}
-                </span>
-            ),
-        },
-        {
-            header: "到期日期",
-            accessorKey: "expired_at",
-            cell: ({ row }) => {
-                const value = row.original.expired_at
-                if (!value) return <span className="text-sm text-muted-foreground">—</span>
-                const date = new Date(value)
-                if (Number.isNaN(date.getTime())) {
-                    return <span className="text-sm text-muted-foreground">{value}</span>
-                }
-                return (
-                    <span className="text-sm text-muted-foreground">
-                        {date.toISOString().slice(0, 10)}
-                    </span>
-                )
-            },
-        },
-        {
-            header: "DDNS 状态",
-            accessorKey: "enable_ddns",
-            cell: ({ row }) => (
-                <span className="text-sm font-medium">
-                    {row.original.enable_ddns
-                            ? t("Enabled", { defaultValue: "启用" })
-                            : t("Disabled", { defaultValue: "禁用" })}
-                    </span>
-                ),
-            },
-        {
-            header: "游客可见",
-            accessorKey: "hide_for_guest",
-            cell: ({ row }) => (
-                <span className="text-sm font-medium">
-                    {row.original.hide_for_guest
-                            ? t("Enabled", { defaultValue: "启用" })
-                            : t("Disabled", { defaultValue: "禁用" })}
-                    </span>
-                ),
-        },
-        {
-            id: "note",
-            header: "备注",
-            cell: ({ row }) => {
-                const s = row.original
-                return <NoteMenu note={{ private: s.note, public: s.public_note }} />
-            },
-        },
-            {
-                id: "uuid",
-                header: "UUID",
-                cell: ({ row }) => <CopyButton text={row.original.uuid} />,
-        },
-        {
-            id: "actions",
-            header: "操作",
-            cell: ({ row }) => {
-                const s = row.original
-                return (
-                    <ActionButtonGroup
-                            className="flex gap-2"
-                            delete={{ fn: deleteServer, id: [s.id], mutate: mutate }}
-                        >
-                            <>
-                                <TerminalButton id={s.id} />
-                                <ServerCard mutate={mutate} data={s} />
-                            </>
-                        </ActionButtonGroup>
-                    )
+                meta: {
+                    headerClassName:
+                        "sticky right-0 z-10 min-w-[190px] bg-background text-right shadow-[inset_12px_0_8px_-12px_rgba(15,23,42,0.18)] backdrop-blur supports-[backdrop-filter]:bg-background/80",
+                    cellClassName:
+                        "sticky right-0 z-10 min-w-[190px] bg-background text-right shadow-[inset_12px_0_8px_-12px_rgba(15,23,42,0.18)] backdrop-blur supports-[backdrop-filter]:bg-background/80",
                 },
             },
         ]
-    }, [mutate, serverGroups, t])
+
+        return baseColumns
+    }, [columnConfigs, mutate, t])
 
     const table = useReactTable({
         data: visibleServers,
@@ -557,55 +644,68 @@ export default function ServerPage() {
                             ) : null}
                         </div>
                     </aside>
-                    <section className="overflow-hidden rounded-lg border bg-background">
-                        <Table>
-                            <TableHeader>
-                                {table.getHeaderGroups().map((headerGroup) => (
-                                    <TableRow key={headerGroup.id}>
-                                        {headerGroup.headers.map((header) => (
-                                            <TableHead key={header.id} className="text-sm">
-                                                {header.isPlaceholder
-                                                    ? null
-                                                    : flexRender(
-                                                          header.column.columnDef.header,
-                                                          header.getContext(),
-                                                      )}
-                                            </TableHead>
-                                        ))}
-                                    </TableRow>
-                                ))}
-                            </TableHeader>
-                            <TableBody>
-                                {isLoading ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={columns.length}
-                                            className="h-24 text-center"
+                    <section className="relative max-w-full overflow-hidden rounded-lg border bg-background">
+                        <div className="overflow-x-auto">
+                            <Table className="min-w-max w-full">
+                                <TableHeader>
+                                    {table.getHeaderGroups().map((headerGroup) => (
+                                        <TableRow key={headerGroup.id}>
+                                            {headerGroup.headers.map((header) => {
+                                                const headerMeta =
+                                                    (header.column.columnDef.meta as ColumnMeta | undefined) ??
+                                                    {}
+                                                return (
+                                                    <TableHead
+                                                        key={header.id}
+                                                        className={cn(
+                                                            "text-sm font-medium whitespace-nowrap",
+                                                            headerMeta.headerClassName,
+                                                        )}
+                                                    >
+                                                        {header.isPlaceholder
+                                                            ? null
+                                                            : flexRender(
+                                                                  header.column.columnDef.header,
+                                                                  header.getContext(),
+                                                              )}
+                                                    </TableHead>
+                                                )
+                                            })}
+                                        </TableRow>
+                                    ))}
+                                </TableHeader>
+                                <TableBody>
+                                    {isLoading ? (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={columns.length}
+                                                className="h-24 text-center"
+                                            >
+                                                {t("Loading")}...
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : table.getRowModel().rows?.length ? (
+                                        <SortableContext
+                                            items={visibleServerIds}
+                                            strategy={verticalListSortingStrategy}
                                         >
-                                            {t("Loading")}...
-                                        </TableCell>
-                                    </TableRow>
-                                ) : table.getRowModel().rows?.length ? (
-                                    <SortableContext
-                                        items={visibleServerIds}
-                                        strategy={verticalListSortingStrategy}
-                                    >
-                                        {table.getRowModel().rows.map((row) => (
-                                            <SortableTableRow key={row.id} row={row} />
-                                        ))}
-                                    </SortableContext>
-                                ) : (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={columns.length}
-                                            className="h-24 text-center"
-                                        >
-                                            {t("NoResults")}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                                            {table.getRowModel().rows.map((row) => (
+                                                <SortableTableRow key={row.id} row={row} />
+                                            ))}
+                                        </SortableContext>
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={columns.length}
+                                                className="h-24 text-center"
+                                            >
+                                                {t("NoResults")}
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </section>
                 </div>
             </div>
@@ -709,36 +809,33 @@ const SortableTableRow: React.FC<{ row: Row<ModelServer> }> = ({ row }) => {
             className={isDragging ? "opacity-60" : undefined}
             data-state={row.getIsSelected() && "selected"}
         >
-            {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id} className="text-sm">
-                    {cell.column.id === "drag" ? (
-                        <button
-                            type="button"
-                            ref={setActivatorNodeRef}
-                            {...attributes}
-                            {...listeners}
-                            onClick={(event) => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                            }}
-                            className="cursor-grab text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                            <GripVertical className="h-4 w-4" />
-                        </button>
-                    ) : (
-                        flexRender(cell.column.columnDef.cell, cell.getContext())
-                    )}
-                </TableCell>
-            ))}
+            {row.getVisibleCells().map((cell) => {
+                const cellMeta = (cell.column.columnDef.meta as ColumnMeta | undefined) ?? {}
+                return (
+                    <TableCell key={cell.id} className={cn("text-sm", cellMeta.cellClassName)}>
+                        {cell.column.id === "drag" ? (
+                            <button
+                                type="button"
+                                ref={setActivatorNodeRef}
+                                {...attributes}
+                                {...listeners}
+                                onClick={(event) => {
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                    row.toggleSelected(!row.getIsSelected())
+                                }}
+                                className="cursor-grab text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                                <GripVertical className="h-4 w-4" />
+                            </button>
+                        ) : (
+                            flexRender(cell.column.columnDef.cell, cell.getContext())
+                        )}
+                    </TableCell>
+                )
+            })}
         </TableRow>
     )
-}
-
-const getGroupNames = (serverId: number, groups?: ModelServerGroupResponseItem[]) => {
-    if (!groups) return []
-    return groups
-        .filter((group) => group.servers?.includes(serverId))
-        .map((group) => group.group.name)
 }
 
 const computeUngroupedServerIds = (
@@ -823,4 +920,8 @@ const buildServerUpdatePayload = (server: ModelServer): ModelServerForm => ({
     expired_at: server.expired_at,
     ddns_profiles: server.ddns_profiles,
     override_ddns_domains: server.override_ddns_domains,
+    purchase_price: server.purchase_price ?? null,
+    purchase_date: server.purchase_date ?? null,
+    purchase_years: server.purchase_years ?? null,
+    monthly_traffic: server.monthly_traffic ?? null,
 })

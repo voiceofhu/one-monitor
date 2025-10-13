@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"strings"
 
 	pb "github.com/nezhahq/nezha/proto"
 )
@@ -179,10 +180,14 @@ type GeoIP struct {
 
 func PB2GeoIP(p *pb.GeoIP) GeoIP {
 	pbIP := p.GetIp()
-	return GeoIP{
-		IP: IP{
-			IPv4Addr: pbIP.GetIpv4(),
-			IPv6Addr: pbIP.GetIpv6(),
-		},
+	geo := GeoIP{
+		CountryCode: strings.ToUpper(strings.TrimSpace(p.GetCountryCode())),
 	}
+	if pbIP != nil {
+		geo.IP = IP{
+			IPv4Addr: strings.TrimSpace(pbIP.GetIpv4()),
+			IPv6Addr: strings.TrimSpace(pbIP.GetIpv6()),
+		}
+	}
+	return geo
 }

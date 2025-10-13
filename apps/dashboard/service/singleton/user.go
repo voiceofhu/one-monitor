@@ -69,14 +69,15 @@ func OnUserDelete(id []uint64, errorFunc func(string, ...any) error) error {
 		return Localizer.ErrorT("user id not specified")
 	}
 
-	var (
-		cron, server   bool
-		crons, servers []uint64
-	)
-
 	slist := ServerShared.GetSortedList()
 	clist := CronShared.GetSortedList()
 	for _, uid := range id {
+		var (
+			cron, server   bool
+			crons, servers []uint64
+			natIDs         []uint64
+		)
+
 		err := DB.Transaction(func(tx *gorm.DB) error {
 			crons = model.FindByUserID(clist, uid)
 			cron = len(crons) > 0
@@ -89,16 +90,11 @@ func OnUserDelete(id []uint64, errorFunc func(string, ...any) error) error {
 			servers = model.FindByUserID(slist, uid)
 			server = len(servers) > 0
 			if server {
-				if err := tx.Unscoped().Delete(&model.Server{}, "id in (?)", servers).Error; err != nil {
+				var err error
+				natIDs, err = DeleteServers(tx, servers)
+				if err != nil {
 					return err
 				}
-				if err := tx.Unscoped().Delete(&model.ServerGroupServer{}, "server_id in (?)", servers).Error; err != nil {
-					return err
-				}
-			}
-
-			if err := tx.Unscoped().Delete(&model.Transfer{}, "server_id in (?)", servers).Error; err != nil {
-				return err
 			}
 
 			if err := tx.Where("id IN (?)", id).Delete(&model.User{}).Error; err != nil {
@@ -128,6 +124,9 @@ func OnUserDelete(id []uint64, errorFunc func(string, ...any) error) error {
 			}
 			AlertsLock.Unlock()
 			ServerShared.Delete(servers)
+			if len(natIDs) > 0 {
+				NATShared.Delete(natIDs)
+			}
 		}
 
 		secret := UserInfoMap[uid].AgentSecret

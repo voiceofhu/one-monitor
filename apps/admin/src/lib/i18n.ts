@@ -38,13 +38,13 @@ const resources = {
 }
 
 const getStoredLanguage = () => {
-    return localStorage.getItem("language") || "en-US"
+    return localStorage.getItem("language") || "zh-CN"
 }
 
 i18n.use(initReactI18next).init({
     resources,
     lng: getStoredLanguage(), // 使用localStorage中存储的语言或默认值
-    fallbackLng: "en-US", // 当前语言的翻译没有找到时，使用的备选语言
+    fallbackLng: "zh-CN", // 当前语言的翻译没有找到时，使用的备选语言
     interpolation: {
         escapeValue: false, // react已经安全地转义
     },
