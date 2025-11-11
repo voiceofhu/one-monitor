@@ -24,16 +24,9 @@ import { cn, joinIP } from "@/lib/utils"
 import {
     ModelServer,
     ModelServerForm,
-    ModelServerTaskResponse,
     ModelServerGroupResponseItem,
+    ModelServerTaskResponse,
 } from "@/types"
-import {
-    ColumnDef,
-    Row,
-    flexRender,
-    getCoreRowModel,
-    useReactTable,
-} from "@tanstack/react-table"
 import {
     DndContext,
     DragEndEvent,
@@ -52,6 +45,7 @@ import {
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { ColumnDef, Row, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table"
 import { GripVertical, Loader2 } from "lucide-react"
 import {
     type CSSProperties,
@@ -168,19 +162,6 @@ export default function ServerPage() {
                 type: "group",
             })
         })
-
-        const ungroupedCount = orderedServers.filter((server) => !assigned.has(server.id)).length
-        if (ungroupedCount > 0) {
-            map.set(UNGROUPED_CATEGORY_ID, {
-                id: UNGROUPED_CATEGORY_ID,
-                label: t("UngroupedServers", { defaultValue: "未分组" }),
-                count: ungroupedCount,
-                type: "static",
-            })
-        } else {
-            map.delete(UNGROUPED_CATEGORY_ID)
-        }
-
         return map
     }, [orderedServers, serverGroups, t])
 
@@ -208,7 +189,11 @@ export default function ServerPage() {
     )
 
     const currencyFormatter = useMemo(
-        () => new Intl.NumberFormat(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+        () =>
+            new Intl.NumberFormat(undefined, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+            }),
         [],
     )
 
@@ -248,18 +233,18 @@ export default function ServerPage() {
                     </span>
                 ),
             },
-            {
-                id: "account",
-                header: t("Account", { defaultValue: "账号" }),
-                headerClassName: "min-w-[120px] px-3",
-                cellClassName: "min-w-[120px] px-3 py-2 text-xs text-muted-foreground",
-                render: (server) => server.account || empty,
-            },
+            // {
+            //     id: "account",
+            //     header: t("Account", { defaultValue: "账号" }),
+            //     headerClassName: "min-w-[120px] px-3",
+            //     cellClassName: "min-w-[120px] px-3 py-2 text-xs text-muted-foreground",
+            //     render: (server) => server.account || empty,
+            // },
             {
                 id: "ip",
-                header: "IP",
-                headerClassName: "min-w-[150px] px-3",
-                cellClassName: "min-w-[150px] px-3 py-2 text-xs text-muted-foreground",
+                header: "IP地址",
+                headerClassName: "min-w-[100px] px-3",
+                cellClassName: "min-w-[100px] px-3 py-2 text-xs text-muted-foreground",
                 render: (server) => {
                     const ipText = joinIP(server.geoip?.ip)
                     if (!ipText) return empty
@@ -273,22 +258,22 @@ export default function ServerPage() {
             {
                 id: "purchase_price",
                 header: t("PurchasePrice", { defaultValue: "购入价格" }),
-                headerClassName: "min-w-[120px] px-3 text-right",
-                cellClassName: "min-w-[120px] px-3 py-2 text-right",
+                headerClassName: "min-w-[100px] px-3 text-right",
+                cellClassName: "min-w-[100px] px-3 py-2 text-right",
                 render: (server) => formatPrice(server.purchase_price),
             },
             {
                 id: "agent_version",
                 header: t("AgentVersion", { defaultValue: "Agent 版本" }),
-                headerClassName: "w-[120px] px-3 text-center",
-                cellClassName: "w-[120px] px-3 py-2 text-center text-xs text-muted-foreground",
+                headerClassName: "w-[100px] px-3 text-center",
+                cellClassName: "w-[100px] px-3 py-2 text-center text-xs text-muted-foreground",
                 render: (server) => server.host?.version || t("Unknown"),
             },
             {
                 id: "purchase_date",
                 header: t("PurchaseDate", { defaultValue: "购买日期" }),
-                headerClassName: "min-w-[120px] px-3",
-                cellClassName: "min-w-[120px] px-3 py-2",
+                headerClassName: "min-w-[100px] px-3",
+                cellClassName: "min-w-[100px] px-3 py-2",
                 render: (server) => formatDate(server.purchase_date),
             },
             {
@@ -343,7 +328,9 @@ export default function ServerPage() {
                 header: t("Note", { defaultValue: "备注" }),
                 headerClassName: "w-[120px] px-3 text-center",
                 cellClassName: "w-[120px] px-3 py-2 text-center",
-                render: (server) => <NoteMenu note={{ private: server.note, public: server.public_note }} />,
+                render: (server) => (
+                    <NoteMenu note={{ private: server.note, public: server.public_note }} />
+                ),
             },
             {
                 id: "uuid",
@@ -537,11 +524,7 @@ export default function ServerPage() {
     )
 
     return (
-        <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-        >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <div className="px-3">
                 <div className="flex mt-6 mb-4 items-center gap-3">
                     <h1 className="text-3xl font-bold tracking-tight">{t("Server")}</h1>
@@ -652,8 +635,9 @@ export default function ServerPage() {
                                         <TableRow key={headerGroup.id}>
                                             {headerGroup.headers.map((header) => {
                                                 const headerMeta =
-                                                    (header.column.columnDef.meta as ColumnMeta | undefined) ??
-                                                    {}
+                                                    (header.column.columnDef.meta as
+                                                        | ColumnMeta
+                                                        | undefined) ?? {}
                                                 return (
                                                     <TableHead
                                                         key={header.id}
@@ -679,7 +663,7 @@ export default function ServerPage() {
                                         <TableRow>
                                             <TableCell
                                                 colSpan={columns.length}
-                                                className="h-24 text-center"
+                                                className="text-center"
                                             >
                                                 {t("Loading")}...
                                             </TableCell>
@@ -743,8 +727,15 @@ const SortableCategoryItem: React.FC<{
     active: boolean
     onSelect: (id: string) => void
 }> = ({ id, label, count, active, onSelect }) => {
-    const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-        useSortable({ id })
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        setActivatorNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id })
     const style: CSSProperties = {
         transform: CSS.Transform.toString(transform),
         transition,

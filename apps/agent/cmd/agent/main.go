@@ -172,7 +172,7 @@ func preRun(configPath string) error {
 func main() {
 	// CLI 支持直接运行、编辑配置和安装服务等子命令
 	app := &cli.App{
-		Usage:   "哪吒监控 Agent",
+		Usage:   "Agent",
 		Version: version,
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "配置文件路径"},
